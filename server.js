@@ -1,12 +1,43 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
+import { createClient } from "@supabase/supabase-js";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 const app = express();
 const port = process.env.PORT || 3000;
+
+app.use(express.json({ limit: "2mb" }));
+
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+const r2AccountId = process.env.R2_ACCOUNT_ID || "";
+const r2AccessKeyId = process.env.R2_ACCESS_KEY_ID || "";
+const r2SecretAccessKey = process.env.R2_SECRET_ACCESS_KEY || "";
+const r2Bucket = process.env.R2_BUCKET_NAME || "";
+const r2PublicUrl = process.env.R2_PUBLIC_URL || "";
+
+const supabaseAdmin = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
+  : null;
+
+const r2Client = r2AccountId && r2AccessKeyId && r2SecretAccessKey
+  ? new S3Client({
+      region: "auto",
+      endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: r2AccessKeyId,
+        secretAccessKey: r2SecretAccessKey
+      }
+    })
+  : null;
 
 function sendIndex(res) {
   const filePath = path.join(dirname, "index.html");
@@ -17,16 +48,175 @@ function sendIndex(res) {
   res.type("html").send(html);
 }
 
+function safeName(value) {
+  return String(value || "file").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").slice(0, 120);
+}
+
+function videoKey({ courseId, lessonId, fileName }) {
+  const ext = path.extname(fileName || "video.mp4") || ".mp4";
+  const id = crypto.randomUUID();
+  return `courses/${safeName(courseId)}/lessons/${safeName(lessonId)}/${id}${ext}`;
+}
+
+async function getAuthUser(req) {
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token) return null;
+  const client = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+  const result = await client.auth.getUser(token);
+  return result.data?.user || null;
+}
+
+async function getProfile(userId) {
+  if (!supabaseAdmin || !userId) return null;
+  const result = await supabaseAdmin.from("profiles").select("id, role, status").eq("id", userId).maybeSingle();
+  return result.data || null;
+}
+
+async function requireAdmin(req, res, next) {
+  const user = await getAuthUser(req);
+  const profile = await getProfile(user?.id);
+  if (!user || !profile || profile.role !== "admin" || profile.status !== "active") {
+    res.status(403).json({ error: "Admin permission required" });
+    return;
+  }
+  req.user = user;
+  req.profile = profile;
+  next();
+}
+
+async function userHasLessonAccess(userId, lessonId) {
+  if (!supabaseAdmin || !userId || !lessonId) return false;
+  const lessonResult = await supabaseAdmin.from("lessons").select("id, course_id, is_preview").eq("id", lessonId).maybeSingle();
+  const lesson = lessonResult.data;
+  if (!lesson) return false;
+  if (lesson.is_preview) return true;
+  const enrollment = await supabaseAdmin
+    .from("enrollments")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("course_id", lesson.course_id)
+    .eq("status", "active")
+    .maybeSingle();
+  return Boolean(enrollment.data?.id);
+}
+
 app.get("/health", function (req, res) {
-  res.status(200).json({ ok: true });
+  res.status(200).json({ ok: true, service: "eduvideo" });
 });
 
 app.get("/api/config", function (req, res) {
   res.status(200).json({
-    supabaseUrl: process.env.SUPABASE_URL || "",
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "",
-    productionReady: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY)
+    supabaseUrl,
+    supabaseAnonKey,
+    productionReady: Boolean(supabaseUrl && supabaseAnonKey),
+    r2Ready: Boolean(r2Client && r2Bucket),
+    videoMode: r2Client && r2Bucket ? "r2-signed-url" : "demo"
   });
+});
+
+app.get("/api/admin/status", requireAdmin, function (req, res) {
+  res.json({ ok: true, supabaseReady: Boolean(supabaseAdmin), r2Ready: Boolean(r2Client && r2Bucket) });
+});
+
+app.post("/api/admin/r2/presign-upload", requireAdmin, async function (req, res) {
+  try {
+    if (!r2Client || !r2Bucket) {
+      res.status(500).json({ error: "R2 is not configured" });
+      return;
+    }
+    const { courseId, lessonId, fileName, contentType } = req.body || {};
+    if (!courseId || !lessonId || !fileName) {
+      res.status(400).json({ error: "courseId, lessonId and fileName are required" });
+      return;
+    }
+    const key = videoKey({ courseId, lessonId, fileName });
+    const command = new PutObjectCommand({
+      Bucket: r2Bucket,
+      Key: key,
+      ContentType: contentType || "video/mp4"
+    });
+    const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 900 });
+    res.json({ uploadUrl, key, expiresIn: 900, publicUrl: r2PublicUrl ? `${r2PublicUrl.replace(/\/$/, "")}/${key}` : "" });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not create upload URL" });
+  }
+});
+
+app.post("/api/admin/lessons/:lessonId/video", requireAdmin, async function (req, res) {
+  try {
+    if (!supabaseAdmin) {
+      res.status(500).json({ error: "Supabase service role is not configured" });
+      return;
+    }
+    const { r2Key, videoProvider } = req.body || {};
+    if (!r2Key) {
+      res.status(400).json({ error: "r2Key is required" });
+      return;
+    }
+    const result = await supabaseAdmin
+      .from("lessons")
+      .update({ video_provider: videoProvider || "cloudflare-r2", video_asset_id: r2Key, video_url: null })
+      .eq("id", req.params.lessonId)
+      .select("id, course_id, title, video_provider, video_asset_id")
+      .maybeSingle();
+    if (result.error) {
+      res.status(500).json({ error: result.error.message });
+      return;
+    }
+    res.json({ lesson: result.data });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not attach video" });
+  }
+});
+
+app.post("/api/video/:lessonId/signed-url", async function (req, res) {
+  try {
+    if (!r2Client || !r2Bucket || !supabaseAdmin) {
+      res.status(500).json({ error: "Video service is not configured" });
+      return;
+    }
+    const user = await getAuthUser(req);
+    if (!user) {
+      res.status(401).json({ error: "Login required" });
+      return;
+    }
+    const hasAccess = await userHasLessonAccess(user.id, req.params.lessonId);
+    if (!hasAccess) {
+      res.status(403).json({ error: "No lesson access" });
+      return;
+    }
+    const lessonResult = await supabaseAdmin.from("lessons").select("id, video_asset_id").eq("id", req.params.lessonId).maybeSingle();
+    const lesson = lessonResult.data;
+    if (!lesson?.video_asset_id) {
+      res.status(404).json({ error: "Video is not attached" });
+      return;
+    }
+    const command = new GetObjectCommand({ Bucket: r2Bucket, Key: lesson.video_asset_id });
+    const videoUrl = await getSignedUrl(r2Client, command, { expiresIn: 1800 });
+    res.json({ videoUrl, expiresIn: 1800 });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not create video URL" });
+  }
+});
+
+app.delete("/api/admin/r2/object", requireAdmin, async function (req, res) {
+  try {
+    if (!r2Client || !r2Bucket) {
+      res.status(500).json({ error: "R2 is not configured" });
+      return;
+    }
+    const { key } = req.body || {};
+    if (!key) {
+      res.status(400).json({ error: "key is required" });
+      return;
+    }
+    await r2Client.send(new DeleteObjectCommand({ Bucket: r2Bucket, Key: key }));
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not delete R2 object" });
+  }
 });
 
 app.get("/", function (req, res) {
