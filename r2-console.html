@@ -27,7 +27,7 @@
       .bad { color:var(--danger); font-weight:800; }
       video { width:100%; border-radius:18px; background:#000; margin-top:14px; }
       .full { grid-column:1/-1; }
-      @media(max-width:820px){ .grid{grid-template-columns:1fr;} }
+      @media(max-width:820px){ .grid{grid-template-columns:1fr;} .actions a,.actions button{width:100%;} }
     </style>
   </head>
   <body>
@@ -41,8 +41,8 @@
       <section class="card full">
         <h2>1. Cấu hình chung</h2>
         <div class="field"><label>Base URL Railway</label><input id="baseUrl" placeholder="https://domain.up.railway.app" /></div>
-        <div class="field"><label>Admin Supabase Access Token</label><textarea id="adminToken" placeholder="Dán access token của tài khoản admin"></textarea></div>
-        <div class="actions"><button onclick="checkConfig()">Kiểm tra cấu hình</button><button class="secondary" onclick="saveLocal()">Lưu tạm trên trình duyệt</button></div>
+        <div class="field"><label>Admin Supabase Access Token</label><textarea id="adminToken" placeholder="Dán access token admin nếu trang chính chưa đăng nhập"></textarea></div>
+        <div class="actions"><button onclick="checkConfig()">Kiểm tra cấu hình</button><button class="secondary" onclick="saveLocal()">Lưu cấu hình không gồm token</button></div>
         <pre id="configStatus" class="status">Chưa kiểm tra.</pre>
       </section>
 
@@ -65,7 +65,7 @@
       <section class="card full">
         <h2>4. Test học viên xem video</h2>
         <p>Học viên phải có enrollment active hoặc bài học là preview.</p>
-        <div class="field"><label>Student Supabase Access Token</label><textarea id="studentToken" placeholder="Dán access token của học viên có quyền học"></textarea></div>
+        <div class="field"><label>Student Supabase Access Token</label><textarea id="studentToken" placeholder="Dán access token học viên nếu trang chính chưa đăng nhập"></textarea></div>
         <div class="field"><label>Lesson ID cần xem</label><input id="watchLessonId" placeholder="UUID bài học" /></div>
         <div class="actions"><button onclick="getVideoUrl()">Lấy signed URL xem video</button></div>
         <pre id="watchStatus" class="status">Chưa test xem video.</pre>
@@ -78,40 +78,55 @@
       function $(id){ return document.getElementById(id); }
       function base(){ return ($('baseUrl').value || window.location.origin).replace(/\/$/, ''); }
       function out(id, value){ $(id).textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
+      function parseJson(value){ try { return JSON.parse(value || '{}'); } catch(err) { return {}; } }
+      function sessionToken(){ return parseJson(localStorage.getItem('eduvideo_production_session_v1') || sessionStorage.getItem('eduvideo_production_session_v1') || '{}').accessToken || ''; }
+      function adminToken(){ return $('adminToken').value.trim() || sessionStorage.getItem('eduvideo_admin_access_token') || sessionToken(); }
+      function studentToken(){ return $('studentToken').value.trim() || sessionToken(); }
       function headers(token){ return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+      function friendlyError(message){
+        if(message === 'Server returned non-JSON response') return 'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra route API, proxy hoặc biến môi trường.';
+        if(/Admin permission required/i.test(message || '')) return 'Token hiện tại chưa có quyền admin. Cần profile role=admin và status=active.';
+        return message || 'Có lỗi xảy ra.';
+      }
+      async function jsonFetch(url, options){
+        const res = await fetch(url, options);
+        const text = await res.text();
+        const json = parseJson(text);
+        if(!text.trim().startsWith('{') && !text.trim().startsWith('[')) throw new Error('Server returned non-JSON response');
+        if(!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+        return json;
+      }
 
       function loadLocal(){
-        const saved = JSON.parse(localStorage.getItem('eduvideo_r2_console') || '{}');
-        ['baseUrl','adminToken','courseId','lessonId','r2Key','studentToken','watchLessonId'].forEach(id => { if(saved[id]) $(id).value = saved[id]; });
+        const saved = parseJson(localStorage.getItem('eduvideo_r2_console') || '{}');
+        ['baseUrl','courseId','lessonId','r2Key','watchLessonId'].forEach(id => { if(saved[id]) $(id).value = saved[id]; });
       }
       function saveLocal(){
         const data = {};
-        ['baseUrl','adminToken','courseId','lessonId','r2Key','studentToken','watchLessonId'].forEach(id => data[id] = $(id).value);
+        ['baseUrl','courseId','lessonId','r2Key','watchLessonId'].forEach(id => data[id] = $(id).value);
         localStorage.setItem('eduvideo_r2_console', JSON.stringify(data));
-        alert('Đã lưu tạm trên trình duyệt này. Không dùng máy lạ để lưu token.');
+        alert('Đã lưu cấu hình không gồm token. Token chỉ giữ trong ô nhập hiện tại/session.');
       }
 
       async function checkConfig(){
         try{
-          const res = await fetch(base() + '/api/config', { cache:'no-store' });
-          const json = await res.json();
+          const json = await jsonFetch(base() + '/api/config', { cache:'no-store' });
           out('configStatus', json);
-        }catch(err){ out('configStatus', 'Lỗi: ' + err.message); }
+        }catch(err){ out('configStatus', 'Lỗi: ' + friendlyError(err.message)); }
       }
 
       async function createUploadUrl(){
         const file = $('videoFile').files[0];
         if(!file){ alert('Chọn file video trước.'); return; }
+        if(!adminToken()){ alert('Cần token admin Supabase. Hãy đăng nhập admin ở trang chính hoặc dán token.'); return; }
         const body = { courseId:$('courseId').value, lessonId:$('lessonId').value, fileName:file.name, contentType:file.type || 'video/mp4' };
         try{
-          const res = await fetch(base() + '/api/admin/r2/presign-upload', { method:'POST', headers:headers($('adminToken').value), body:JSON.stringify(body) });
-          const json = await res.json();
-          if(!res.ok) throw new Error(json.error || 'Không tạo được upload URL');
+          const json = await jsonFetch(base() + '/api/admin/r2/presign-upload', { method:'POST', headers:headers(adminToken()), body:JSON.stringify(body) });
           uploadUrl = json.uploadUrl;
           $('r2Key').value = json.key;
           out('uploadStatus', json);
           saveLocal();
-        }catch(err){ out('uploadStatus', 'Lỗi: ' + err.message); }
+        }catch(err){ out('uploadStatus', 'Lỗi: ' + friendlyError(err.message)); }
       }
 
       async function uploadVideo(){
@@ -123,30 +138,28 @@
           const res = await fetch(uploadUrl, { method:'PUT', headers:{ 'Content-Type': file.type || 'video/mp4' }, body:file });
           if(!res.ok) throw new Error('Upload lỗi HTTP ' + res.status);
           out('uploadStatus', 'Upload thành công lên R2. Bước tiếp theo: bấm Gắn video vào lesson.');
-        }catch(err){ out('uploadStatus', 'Lỗi: ' + err.message); }
+        }catch(err){ out('uploadStatus', 'Lỗi: ' + friendlyError(err.message)); }
       }
 
       async function attachVideo(){
         const lessonId = $('lessonId').value;
         const r2Key = $('r2Key').value.trim();
+        if(!adminToken()){ alert('Cần token admin Supabase.'); return; }
         try{
-          const res = await fetch(base() + '/api/admin/lessons/' + lessonId + '/video', { method:'POST', headers:headers($('adminToken').value), body:JSON.stringify({ r2Key, videoProvider:'cloudflare-r2' }) });
-          const json = await res.json();
-          if(!res.ok) throw new Error(json.error || 'Không gắn được video');
+          const json = await jsonFetch(base() + '/api/admin/lessons/' + lessonId + '/video', { method:'POST', headers:headers(adminToken()), body:JSON.stringify({ r2Key, videoProvider:'cloudflare-r2' }) });
           out('attachStatus', json);
-        }catch(err){ out('attachStatus', 'Lỗi: ' + err.message); }
+        }catch(err){ out('attachStatus', 'Lỗi: ' + friendlyError(err.message)); }
       }
 
       async function getVideoUrl(){
         const lessonId = $('watchLessonId').value || $('lessonId').value;
+        if(!studentToken()){ alert('Cần token học viên có quyền học.'); return; }
         try{
-          const res = await fetch(base() + '/api/video/' + lessonId + '/signed-url', { method:'POST', headers:{ 'Authorization':'Bearer ' + $('studentToken').value } });
-          const json = await res.json();
-          if(!res.ok) throw new Error(json.error || 'Không lấy được video URL');
+          const json = await jsonFetch(base() + '/api/video/' + lessonId + '/signed-url', { method:'POST', headers:{ 'Authorization':'Bearer ' + studentToken() } });
           out('watchStatus', json);
           $('player').src = json.videoUrl;
           $('player').load();
-        }catch(err){ out('watchStatus', 'Lỗi: ' + err.message); }
+        }catch(err){ out('watchStatus', 'Lỗi: ' + friendlyError(err.message)); }
       }
       loadLocal();
     </script>
