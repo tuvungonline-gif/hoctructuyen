@@ -1,0 +1,203 @@
+/* Part 3: checkout demo, orders, notes, questions, backend plan */
+.secure-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #166534;
+  font-weight: 800;
+}
+
+.checkout-grid,
+.backend-grid,
+.learning-tools-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.learning-tools-grid {
+  margin-top: 18px;
+}
+
+.learning-tools-grid .part3-full {
+  grid-column: 1 / -1;
+}
+
+.order-summary {
+  position: sticky;
+  top: 92px;
+}
+
+.mini-order-course {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #f8fafc;
+  margin-bottom: 16px;
+}
+
+.summary-line,
+.summary-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-total {
+  border-bottom: none;
+  font-size: 1.1rem;
+}
+
+.bank-box {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.bank-box span {
+  color: #334155;
+  font-size: 0.92rem;
+}
+
+.resource-list,
+.schema-list,
+.question-list,
+.order-list {
+  display: grid;
+  gap: 10px;
+}
+
+.resource-item,
+.schema-list > div,
+.question-item,
+.order-row {
+  display: grid;
+  gap: 5px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.resource-item {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.resource-item span,
+.schema-list span,
+.question-item small,
+.order-row small {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.question-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.question-form input,
+.learning-tools-grid textarea,
+.checkout-card select {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.order-row {
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+}
+
+.account-orders-panel {
+  grid-column: 2;
+}
+
+.backend-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.backend-wide {
+  grid-column: 1 / -1;
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.checklist-grid label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.part3-admin-block {
+  margin: 32px 0;
+}
+
+.empty-state.small {
+  padding: 18px;
+  text-align: left;
+}
+
+@media (max-width: 900px) {
+  .checkout-grid,
+  .backend-grid,
+  .learning-tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-summary {
+    position: static;
+  }
+
+  .account-orders-panel {
+    grid-column: auto;
+  }
+
+  .checklist-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .question-form,
+  .order-row,
+  .resource-item {
+    grid-template-columns: 1fr;
+  }
+
+  .secure-box {
+    width: 100%;
+    border-radius: 16px;
+  }
+}
