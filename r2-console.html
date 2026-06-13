@@ -47,17 +47,18 @@
       </section>
 
       <section class="card">
-        <h2>2. Tạo link upload video</h2>
+        <h2>2. Upload video</h2>
+        <p>Ưu tiên upload qua backend để tránh lỗi CORS R2 / Failed to fetch.</p>
         <div class="field"><label>Course ID</label><input id="courseId" placeholder="ID khóa học trong backend local" /></div>
         <div class="field"><label>Lesson ID</label><input id="lessonId" placeholder="ID bài học trong backend local" /></div>
         <div class="field"><label>File video</label><input id="videoFile" type="file" accept="video/*" /></div>
-        <div class="actions"><button onclick="createUploadUrl()">Tạo signed upload URL</button><button onclick="uploadVideo()">Upload video lên R2</button></div>
+        <div class="actions"><button onclick="uploadVideo()">Upload video qua backend</button><button class="secondary" onclick="createUploadUrl()">Tạo signed URL dự phòng</button></div>
         <pre id="uploadStatus" class="status">Chưa upload.</pre>
       </section>
 
       <section class="card">
         <h2>3. Gắn video vào lesson</h2>
-        <div class="field"><label>R2 Key</label><textarea id="r2Key" placeholder="Tự điền sau khi tạo upload URL hoặc dán key"></textarea></div>
+        <div class="field"><label>R2 Key</label><textarea id="r2Key" placeholder="Tự điền sau khi upload hoặc dán key"></textarea></div>
         <div class="actions"><button onclick="attachVideo()">Gắn video vào lesson</button></div>
         <pre id="attachStatus" class="status">Chưa gắn video.</pre>
       </section>
@@ -83,8 +84,10 @@
       function adminToken(){ return $('adminToken').value.trim() || sessionStorage.getItem('eduvideo_admin_access_token') || sessionToken(); }
       function studentToken(){ return $('studentToken').value.trim() || sessionToken(); }
       function headers(token){ return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+      function uploadHeaders(file){ return { 'Authorization':'Bearer ' + adminToken(), 'Content-Type': file.type || 'video/mp4' }; }
       function friendlyError(message){
         if(message === 'Server returned non-JSON response') return 'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra route API, proxy hoặc biến môi trường.';
+        if(/Failed to fetch|NetworkError|Load failed/i.test(message || '')) return 'Không upload được video. Lỗi này thường do CORS R2 hoặc deploy chưa có route upload proxy mới.';
         if(/Admin permission required/i.test(message || '')) return 'Token hiện tại chưa có quyền admin. Hãy đăng nhập admin nội bộ hoặc dùng ADMIN_TOKEN.';
         return message || 'Có lỗi xảy ra.';
       }
@@ -132,12 +135,18 @@
       async function uploadVideo(){
         const file = $('videoFile').files[0];
         if(!file){ alert('Chọn file video trước.'); return; }
-        if(!uploadUrl){ alert('Tạo signed upload URL trước.'); return; }
+        if(!adminToken()){ alert('Cần token admin.'); return; }
+        const params = new URLSearchParams({ courseId:$('courseId').value, lessonId:$('lessonId').value, fileName:file.name, contentType:file.type || 'video/mp4' });
         try{
-          out('uploadStatus', 'Đang upload, vui lòng chờ...');
-          const res = await fetch(uploadUrl, { method:'PUT', headers:{ 'Content-Type': file.type || 'video/mp4' }, body:file });
-          if(!res.ok) throw new Error('Upload lỗi HTTP ' + res.status);
-          out('uploadStatus', 'Upload thành công lên R2. Bước tiếp theo: bấm Gắn video vào lesson.');
+          out('uploadStatus', 'Đang upload video qua backend, vui lòng chờ...');
+          const res = await fetch(base() + '/api/admin/r2/upload-proxy?' + params.toString(), { method:'POST', headers:uploadHeaders(file), body:file });
+          const text = await res.text();
+          const json = parseJson(text);
+          if(!text.trim().startsWith('{') && !text.trim().startsWith('[')) throw new Error('Server returned non-JSON response');
+          if(!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+          $('r2Key').value = json.key;
+          out('uploadStatus', { success:true, message:'Upload thành công qua backend. Bước tiếp theo: bấm Gắn video vào lesson.', upload:json });
+          saveLocal();
         }catch(err){ out('uploadStatus', 'Lỗi: ' + friendlyError(err.message)); }
       }
 
