@@ -49,7 +49,11 @@ function sendIndex(res) {
 }
 
 function safeName(value) {
-  return String(value || "file").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").slice(0, 120);
+  return String(value || "file").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 120) || "item";
+}
+
+function slugify(value) {
+  return safeName(String(value || "khoa-hoc").normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 }
 
 function videoKey({ courseId, lessonId, fileName }) {
@@ -120,6 +124,79 @@ app.get("/api/admin/status", requireAdmin, function (req, res) {
   res.json({ ok: true, supabaseReady: Boolean(supabaseAdmin), r2Ready: Boolean(r2Client && r2Bucket) });
 });
 
+app.get("/api/admin/courses", requireAdmin, async function (req, res) {
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase service role is not configured" });
+    const result = await supabaseAdmin
+      .from("courses")
+      .select("id, slug, title, short_title, price, currency, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (result.error) return res.status(500).json({ error: result.error.message });
+    res.json({ courses: result.data || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load courses" });
+  }
+});
+
+app.post("/api/admin/courses", requireAdmin, async function (req, res) {
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase service role is not configured" });
+    const body = req.body || {};
+    const title = String(body.title || "").trim();
+    if (!title) return res.status(400).json({ error: "title is required" });
+    const baseSlug = slugify(body.slug || title);
+    const slug = `${baseSlug}-${Date.now().toString().slice(-5)}`;
+    const result = await supabaseAdmin
+      .from("courses")
+      .insert({
+        title,
+        slug,
+        short_title: String(body.shortTitle || title).slice(0, 60),
+        description: String(body.description || ""),
+        level: String(body.level || "Cơ bản"),
+        price: Number(body.price || 0),
+        currency: "VND",
+        status: body.status || "published",
+        instructor_id: req.user.id
+      })
+      .select("id, slug, title, short_title, price, currency, status")
+      .single();
+    if (result.error) return res.status(500).json({ error: result.error.message });
+    res.json({ course: result.data });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not create course" });
+  }
+});
+
+app.post("/api/admin/courses/:courseId/lessons", requireAdmin, async function (req, res) {
+  try {
+    if (!supabaseAdmin) return res.status(500).json({ error: "Supabase service role is not configured" });
+    const body = req.body || {};
+    const title = String(body.title || "").trim();
+    if (!title) return res.status(400).json({ error: "lesson title is required" });
+    const result = await supabaseAdmin
+      .from("lessons")
+      .insert({
+        course_id: req.params.courseId,
+        title,
+        description: String(body.description || ""),
+        duration_seconds: Number(body.durationSeconds || 0),
+        is_preview: Boolean(body.isPreview),
+        sort_order: Number(body.sortOrder || 1),
+        status: body.status || "published",
+        video_provider: "cloudflare-r2",
+        video_status: "empty"
+      })
+      .select("id, course_id, title, status, is_preview, sort_order")
+      .single();
+    if (result.error) return res.status(500).json({ error: result.error.message });
+    res.json({ lesson: result.data });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not create lesson" });
+  }
+});
+
 app.post("/api/admin/r2/presign-upload", requireAdmin, async function (req, res) {
   try {
     if (!r2Client || !r2Bucket) {
@@ -150,16 +227,21 @@ app.post("/api/admin/lessons/:lessonId/video", requireAdmin, async function (req
       res.status(500).json({ error: "Supabase service role is not configured" });
       return;
     }
-    const { r2Key, videoProvider } = req.body || {};
+    const { r2Key, videoProvider, contentType, sizeBytes } = req.body || {};
     if (!r2Key) {
       res.status(400).json({ error: "r2Key is required" });
       return;
     }
+    const updateData = { video_provider: videoProvider || "cloudflare-r2", video_asset_id: r2Key, video_url: null };
+    if (contentType) updateData.video_mime_type = contentType;
+    if (sizeBytes) updateData.video_size_bytes = Number(sizeBytes);
+    updateData.video_status = "ready";
+    updateData.video_uploaded_at = new Date().toISOString();
     const result = await supabaseAdmin
       .from("lessons")
-      .update({ video_provider: videoProvider || "cloudflare-r2", video_asset_id: r2Key, video_url: null })
+      .update(updateData)
       .eq("id", req.params.lessonId)
-      .select("id, course_id, title, video_provider, video_asset_id")
+      .select("id, course_id, title, video_provider, video_asset_id, video_status")
       .maybeSingle();
     if (result.error) {
       res.status(500).json({ error: result.error.message });
