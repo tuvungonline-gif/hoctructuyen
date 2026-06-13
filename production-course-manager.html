@@ -78,10 +78,21 @@
       function loadLocal(){const data=readJson(localStorage.getItem('eduvideo_prod_course_manager'));Object.keys(data).forEach(k=>{if($(k))$(k).value=data[k]})}
       function friendlyError(message, step){
         const prefix = step ? 'Bước lỗi: '+step+'\n' : '';
-        if(message === 'Server returned non-JSON response') return prefix+'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra Base API URL, route deploy hoặc backend.';
-        if(/Failed to fetch|NetworkError|Load failed/i.test(message || '')) return prefix+'Không kết nối được backend. Nếu web và backend khác domain, hãy dán link Railway HTTPS vào ô Base API URL và redeploy backend bản mới. Nếu đã dán rồi, kiểm tra CORS hoặc server chưa chạy.';
-        if(message === 'Admin permission required' || message === 'Login required' || /permission/i.test(message || '')) return prefix+'Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Hãy đăng nhập tài khoản admin nội bộ hoặc cấu hình ADMIN_TOKEN.';
-        return prefix+(message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+        const msg = message || '';
+        if(msg === 'Server returned non-JSON response') return prefix+'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra Base API URL, route deploy hoặc backend.';
+        if(/Failed to fetch/i.test(msg)) return prefix+'Không kết nối được backend (Failed to fetch). Nguyên nhân có thể: (1) Backend chưa chạy, (2) URL sai — hãy dán link Railway HTTPS vào ô Base API URL, (3) CORS chưa cấu hình đúng — kiểm tra biến CORS_ORIGINS trên Railway.';
+        if(/NetworkError|net::ERR/i.test(msg)) return prefix+'Lỗi mạng (NetworkError). Kiểm tra kết nối internet và URL backend.';
+        if(/Load failed/i.test(msg)) return prefix+'Không tải được dữ liệu từ backend (Load failed). Kiểm tra URL và CORS.';
+        if(/timeout|timed out|ETIMEDOUT/i.test(msg)) return prefix+'Hết thời gian chờ (timeout). File quá lớn hoặc kết nối chậm. Thử lại hoặc dùng file nhỏ hơn.';
+        if(/413|too large|File too large/i.test(msg)) return prefix+'File quá lớn. Kích thước tối đa cho phép là 2 GB.';
+        if(/504/i.test(msg)) return prefix+'Backend timeout (504). Upload mất quá nhiều thời gian — thử lại với file nhỏ hơn hoặc kiểm tra kết nối.';
+        if(/CORS/i.test(msg)) return prefix+'Lỗi CORS. Backend chưa cho phép domain này. Kiểm tra biến CORS_ORIGINS trên Railway.';
+        if(msg === 'Admin permission required' || msg === 'Login required' || /permission/i.test(msg)) return prefix+'Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Hãy đăng nhập tài khoản admin nội bộ hoặc cấu hình ADMIN_TOKEN.';
+        if(/401/i.test(msg)) return prefix+'Chưa xác thực (401). Hãy đăng nhập lại.';
+        if(/403/i.test(msg)) return prefix+'Không có quyền truy cập (403). Tài khoản hiện tại không phải admin.';
+        if(/404/i.test(msg)) return prefix+'Không tìm thấy (404). Kiểm tra lại ID khóa học / bài học hoặc URL backend.';
+        if(/500/i.test(msg)) return prefix+'Lỗi máy chủ (500). Kiểm tra log Railway để biết chi tiết.';
+        return prefix+(msg || 'Có lỗi xảy ra. Vui lòng thử lại.');
       }
       async function jsonFetch(url, options, step){
         try{
@@ -93,16 +104,47 @@
           return json;
         }catch(error){throw new Error(friendlyError(error.message, step))}
       }
-      async function uploadVideoThroughBackend(course, lesson, file){
+      const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+      const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+      const MAX_RETRIES = 3;
+
+      function formatBytes(bytes){
+        if(bytes >= 1024*1024*1024) return (bytes/1024/1024/1024).toFixed(2)+' GB';
+        if(bytes >= 1024*1024) return (bytes/1024/1024).toFixed(1)+' MB';
+        return (bytes/1024).toFixed(0)+' KB';
+      }
+
+      async function uploadVideoThroughBackend(course, lesson, file, attempt){
+        attempt = attempt || 1;
         const params = new URLSearchParams({courseId:course.id,lessonId:lesson.id,fileName:file.name,contentType:file.type||'video/mp4'});
+        const controller = new AbortController();
+        const timeoutId = setTimeout(function(){ controller.abort(); }, UPLOAD_TIMEOUT_MS);
         try{
-          const res = await fetch(apiUrl('/api/admin/r2/upload-proxy?' + params.toString()), {method:'POST',headers:authUploadHeaders(file),body:file});
+          log('Đang upload video qua backend (lần thử '+attempt+'/'+MAX_RETRIES+')...\nFile: '+file.name+' ('+formatBytes(file.size)+')');
+          const res = await fetch(apiUrl('/api/admin/r2/upload-proxy?' + params.toString()), {
+            method:'POST',
+            headers:authUploadHeaders(file),
+            body:file,
+            signal:controller.signal
+          });
+          clearTimeout(timeoutId);
           const text = await res.text();
           const json = readJson(text);
           if(!text.trim().startsWith('{') && !text.trim().startsWith('[')) throw new Error('Server returned non-JSON response');
           if(!res.ok) throw new Error(json.error || ('HTTP '+res.status));
           return json;
-        }catch(error){throw new Error(friendlyError(error.message, 'upload video qua backend'))}
+        }catch(error){
+          clearTimeout(timeoutId);
+          const isAbort = error.name === 'AbortError';
+          const errMsg = isAbort ? 'Upload timeout sau '+Math.round(UPLOAD_TIMEOUT_MS/60000)+' phút. File quá lớn hoặc kết nối chậm.' : error.message;
+          const isRetryable = isAbort || /Failed to fetch|NetworkError|Load failed|net::ERR/i.test(error.message||'');
+          if(isRetryable && attempt < MAX_RETRIES){
+            log('Upload thất bại (lần '+attempt+'): '+errMsg+'\nĐang thử lại sau 3 giây...');
+            await new Promise(function(resolve){ setTimeout(resolve, 3000); });
+            return uploadVideoThroughBackend(course, lesson, file, attempt+1);
+          }
+          throw new Error(friendlyError(errMsg, 'upload video qua backend (lần '+attempt+')'));
+        }
       }
       async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()},'kiểm tra backend/admin');log(json)}catch(err){log('Lỗi: '+err.message)}}
       async function createCourseLessonAndUpload(){
@@ -111,20 +153,26 @@
         if(!$('courseTitle').value.trim()) return alert('Nhập tên khóa học.');
         if(!$('lessonTitle').value.trim()) return alert('Nhập tên bài học.');
         if(!file) return alert('Chọn video bài học.');
+        if(file.size > MAX_FILE_BYTES) return alert('File quá lớn: '+formatBytes(file.size)+'. Kích thước tối đa là 2 GB.');
         try{
           saveLocal();
-          log('Đang tạo khóa học...');
+          log('[1/4] Đang tạo khóa học...');
           const courseResult=await jsonFetch('/api/admin/courses',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:$('courseTitle').value,description:$('courseDescription').value,price:Number($('coursePrice').value||0),status:$('courseStatus').value})},'tạo khóa học');
           const course=courseResult.course;
-          log('Đang tạo bài học...');
+          log('[2/4] Đang tạo bài học...');
           const lessonResult=await jsonFetch('/api/admin/courses/'+course.id+'/lessons',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:$('lessonTitle').value,description:$('lessonDescription').value,isPreview:$('isPreview').checked,status:'published',sortOrder:1})},'tạo bài học');
           const lesson=lessonResult.lesson;
-          log('Đang upload video qua backend để tránh lỗi CORS R2...');
+          log('[3/4] Đang upload video qua backend ('+formatBytes(file.size)+')...');
+          const uploadStart=Date.now();
           const uploadMeta=await uploadVideoThroughBackend(course, lesson, file);
-          log('Đang gắn video vào bài học...');
+          const elapsed=((Date.now()-uploadStart)/1000).toFixed(1);
+          log('[4/4] Đang gắn video vào bài học...');
           const attachResult=await jsonFetch('/api/admin/lessons/'+lesson.id+'/video',{method:'POST',headers:authHeaders(),body:JSON.stringify({r2Key:uploadMeta.key,videoProvider:'cloudflare-r2',contentType:file.type||'video/mp4',sizeBytes:file.size})},'gắn video vào bài học');
-          log({success:true,message:'Khóa học đã được tạo thành công. Video đã upload qua backend proxy.',course,lesson:attachResult.lesson,upload:uploadMeta});
-        }catch(err){log('Lỗi: '+err.message)}
+          log(JSON.stringify({success:true,message:'Khóa học đã được tạo thành công. Video đã upload qua backend proxy trong '+elapsed+'s.',course,lesson:attachResult.lesson,upload:uploadMeta},null,2));
+        }catch(err){
+          console.error('[createCourseLessonAndUpload]', err);
+          log('Lỗi: '+err.message);
+        }
       }
       loadLocal();
     </script>
