@@ -1,6 +1,6 @@
 # EduVideo - Website học trực tuyến qua video
 
-Đây là bản giao diện nền cho website học trực tuyến qua video, đã hoàn thành đến **Phần 2: đăng nhập demo, tài khoản học viên, quyền học và tiến độ học tập ở mức frontend**.
+Đây là bản giao diện nền cho website học trực tuyến qua video, đã hoàn thành đến **Phần 3: checkout demo, đơn đăng ký, tài khoản học viên, quyền học, tiến độ học tập, ghi chú/hỏi đáp và khung chuẩn bị backend/database**.
 
 ## Cách chạy
 
@@ -47,8 +47,10 @@ Mật khẩu: admin123
 5. Trang đăng nhập / đăng ký demo.
 6. Trang tài khoản học viên.
 7. Trang quản trị khóa học và quyền học cơ bản.
+8. Trang checkout demo.
+9. Trang kế hoạch backend/database.
 
-## Chức năng phần 2 đã thêm
+## Chức năng đã có
 
 - Đăng nhập demo bằng tài khoản học viên hoặc admin.
 - Đăng ký tài khoản học viên mới bằng dữ liệu localStorage.
@@ -64,7 +66,12 @@ Mật khẩu: admin123
 - Học viên có thể đánh dấu bài đã học.
 - Tiến độ học được tính theo số bài đã hoàn thành.
 - Tiến độ và quyền học lưu trong localStorage.
-- Admin demo có thể mở quyền, tạm khóa hoặc đưa về trạng thái chờ duyệt.
+- Trang checkout demo để tạo đơn đăng ký/thanh toán mẫu.
+- Học viên có thể xem đơn đăng ký/thanh toán demo trong tài khoản.
+- Admin demo có thể xem đơn, xác nhận đơn và mở quyền học.
+- Học viên có thể lưu ghi chú cá nhân trong từng bài học.
+- Học viên có thể gửi câu hỏi trong từng bài học.
+- Trang backend/database mô tả bảng dữ liệu, API tối thiểu và checklist bảo mật.
 - Có nút reset dữ liệu demo.
 
 ## Lưu ý an toàn
@@ -80,19 +87,35 @@ Các phần sau vẫn đang là demo frontend:
 - Lưu tiến độ học.
 - Quản trị học viên.
 - Quản trị khóa học.
+- Đơn đăng ký/thanh toán.
+- Ghi chú/hỏi đáp bài học.
 
 Ở bản thật, các phần liên quan đến tài khoản, thanh toán, video và quyền truy cập phải được kiểm tra ở backend/API/server. Không được chỉ dựa vào localStorage hoặc frontend để bảo vệ video khóa học.
 
 ## Cấu trúc file
 
 ```text
-video-learning-web/
+hoctructuyen/
 ├── index.html
 ├── styles.css
 ├── app.js
+├── part3.css
+├── part3.js
 └── README.md
 ```
 
+## Cách test phần 3
+
+1. Đăng nhập học viên demo.
+2. Vào một trang chi tiết khóa học.
+3. Bấm **Đăng ký / mua khóa học**.
+4. Tạo đơn bằng checkout demo.
+5. Vào **Tài khoản** để xem đơn.
+6. Đăng nhập admin demo.
+7. Vào **Quản trị** để xác nhận đơn và mở quyền học.
+8. Vào trang học video để test ghi chú và hỏi đáp.
+9. Vào menu **Backend** để xem kế hoạch nối database/API thật.
+
 ## Gợi ý phần tiếp theo
 
-Phần 3 nên làm: thiết kế và chuẩn bị cấu trúc backend/database cho người dùng, khóa học, bài học, đăng ký khóa học và tiến độ học tập. Trước khi nối thanh toán thật cần hoàn thiện phân quyền server-side.
+Phần tiếp theo nên làm: nối backend thật cho đăng nhập, database, thanh toán/webhook, bảo vệ video bằng server-side authorization và lưu tiến độ học thật.
