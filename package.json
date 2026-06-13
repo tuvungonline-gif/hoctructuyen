@@ -2,11 +2,11 @@
   "name": "eduvideo-lms-production",
   "version": "1.0.0",
   "description": "EduVideo LMS production-ready frontend/backend shell with local JSON auth and Cloudflare R2 video storage",
-  "main": "server.js",
+  "main": "server-patched.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server-patched.js",
+    "dev": "node server-patched.js"
   },
   "engines": {
     "node": ">=20"
