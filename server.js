@@ -120,6 +120,42 @@ app.get("/api/config", function (req, res) {
   });
 });
 
+app.post("/api/auth/login", async function (req, res) {
+  try {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      res.status(500).json({ error: "Supabase auth is not configured" });
+      return;
+    }
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    if (!email || !password) {
+      res.status(400).json({ error: "email and password are required" });
+      return;
+    }
+    const client = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+    const result = await client.auth.signInWithPassword({ email, password });
+    if (result.error || !result.data?.session?.access_token || !result.data?.user) {
+      res.status(401).json({ error: "Email hoặc mật khẩu chưa đúng." });
+      return;
+    }
+    const user = result.data.user;
+    const profile = await getProfile(user.id);
+    res.json({
+      accessToken: result.data.session.access_token,
+      refreshToken: result.data.session.refresh_token,
+      expiresAt: result.data.session.expires_at,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || user.user_metadata?.full_name || user.email
+      },
+      profile
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not login" });
+  }
+});
+
 app.get("/api/admin/status", requireAdmin, function (req, res) {
   res.json({ ok: true, supabaseReady: Boolean(supabaseAdmin), r2Ready: Boolean(r2Client && r2Bucket) });
 });
