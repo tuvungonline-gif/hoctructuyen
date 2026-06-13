@@ -57,6 +57,12 @@
         if(accessToken) headers.Authorization = 'Bearer '+accessToken;
         return headers;
       }
+      function authUploadHeaders(file){
+        const accessToken = token();
+        const headers = {'Content-Type':file.type||'video/mp4'};
+        if(accessToken) headers.Authorization = 'Bearer '+accessToken;
+        return headers;
+      }
       function saveLocal(){
         const data={courseTitle:$('courseTitle').value,courseDescription:$('courseDescription').value,coursePrice:$('coursePrice').value,lessonTitle:$('lessonTitle').value,lessonDescription:$('lessonDescription').value};
         localStorage.setItem('eduvideo_prod_course_manager',JSON.stringify(data));
@@ -65,6 +71,7 @@
       function loadLocal(){const data=readJson(localStorage.getItem('eduvideo_prod_course_manager'));Object.keys(data).forEach(k=>{if($(k))$(k).value=data[k]})}
       function friendlyError(message){
         if(message === 'Server returned non-JSON response') return 'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra API URL, route deploy hoặc biến môi trường.';
+        if(/Failed to fetch|NetworkError|Load failed/i.test(message || '')) return 'Không upload được video. Nguyên nhân thường là CORS R2 hoặc backend chưa deploy bản mới. Hệ thống đã chuyển sang upload qua backend để tránh lỗi này.';
         if(message === 'Admin permission required' || message === 'Login required' || /permission/i.test(message || '')) return 'Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Hãy đăng nhập tài khoản admin nội bộ hoặc cấu hình ADMIN_TOKEN.';
         return message || 'Có lỗi xảy ra. Vui lòng thử lại.';
       }
@@ -74,6 +81,15 @@
         const json=readJson(text);
         if(!text.trim().startsWith('{') && !text.trim().startsWith('[')) throw new Error('Server returned non-JSON response');
         if(!res.ok)throw new Error(friendlyError(json.error||('HTTP '+res.status)));
+        return json;
+      }
+      async function uploadVideoThroughBackend(course, lesson, file){
+        const params = new URLSearchParams({courseId:course.id,lessonId:lesson.id,fileName:file.name,contentType:file.type||'video/mp4'});
+        const res = await fetch('/api/admin/r2/upload-proxy?' + params.toString(), {method:'POST',headers:authUploadHeaders(file),body:file});
+        const text = await res.text();
+        const json = readJson(text);
+        if(!text.trim().startsWith('{') && !text.trim().startsWith('[')) throw new Error('Server returned non-JSON response');
+        if(!res.ok) throw new Error(friendlyError(json.error || ('HTTP '+res.status)));
         return json;
       }
       async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()});log(json)}catch(err){log('Lỗi: '+friendlyError(err.message))}}
@@ -90,14 +106,11 @@
           log('Đang tạo bài học...');
           const lessonResult=await jsonFetch('/api/admin/courses/'+course.id+'/lessons',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:$('lessonTitle').value,description:$('lessonDescription').value,isPreview:$('isPreview').checked,status:'published',sortOrder:1})});
           const lesson=lessonResult.lesson;
-          log('Đang chuẩn bị upload video...');
-          const uploadMeta=await jsonFetch('/api/admin/r2/presign-upload',{method:'POST',headers:authHeaders(),body:JSON.stringify({courseId:course.id,lessonId:lesson.id,fileName:file.name,contentType:file.type||'video/mp4'})});
-          log('Đang upload video lên R2...');
-          const uploadRes=await fetch(uploadMeta.uploadUrl,{method:'PUT',headers:{'Content-Type':file.type||'video/mp4'},body:file});
-          if(!uploadRes.ok) throw new Error('Upload R2 lỗi HTTP '+uploadRes.status);
+          log('Đang upload video qua backend để tránh lỗi CORS R2...');
+          const uploadMeta=await uploadVideoThroughBackend(course, lesson, file);
           log('Đang gắn video vào bài học...');
           const attachResult=await jsonFetch('/api/admin/lessons/'+lesson.id+'/video',{method:'POST',headers:authHeaders(),body:JSON.stringify({r2Key:uploadMeta.key,videoProvider:'cloudflare-r2',contentType:file.type||'video/mp4',sizeBytes:file.size})});
-          log({success:true,message:'Khóa học đã được tạo thành công.',course,lesson:attachResult.lesson});
+          log({success:true,message:'Khóa học đã được tạo thành công. Video đã upload qua backend proxy.',course,lesson:attachResult.lesson,upload:uploadMeta});
           saveLocal();
         }catch(err){log('Lỗi: '+friendlyError(err.message))}
       }
