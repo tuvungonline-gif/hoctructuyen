@@ -1,6 +1,10 @@
 # EduVideo - Website học trực tuyến qua video
 
-Đây là bản website học trực tuyến qua video ở mức **frontend hoàn thiện để demo/MVP**, đã có giao diện học viên, quản trị, checkout demo, quyền học, tiến độ học tập, ghi chú, hỏi đáp, dashboard, chứng chỉ demo, thông báo và khung chuẩn bị backend/database.
+Đây là bản website học trực tuyến qua video ở mức **frontend MVP hoàn thiện khoảng 90% cho mục đích demo/trình bày/kiểm thử giao diện**.
+
+Web đã có giao diện học viên, quản trị, checkout demo, quyền học, tiến độ học tập, ghi chú, hỏi đáp, dashboard, chứng chỉ demo, thông báo, hỗ trợ học viên, đánh giá khóa học, lịch học, báo cáo admin, trang pháp lý mẫu và khung chuẩn bị backend/database.
+
+> Lưu ý: mức 90% ở đây là **90% frontend/MVP demo**, chưa phải 90% sản phẩm thương mại thật vì chưa có backend, database, thanh toán thật và bảo vệ video server-side.
 
 ## Cách chạy local
 
@@ -54,6 +58,12 @@ Mật khẩu: admin123
 12. Trang thông báo/nhắc học.
 13. Trang cài đặt tài khoản.
 14. Trang admin studio quản trị nội dung demo.
+15. Trang hỗ trợ học viên.
+16. Trang đánh giá khóa học.
+17. Trang lịch học.
+18. Trang báo cáo admin.
+19. Trang điều khoản/chính sách mẫu.
+20. Trang 404 cho GitHub Pages.
 
 ## Chức năng đã có
 
@@ -81,11 +91,21 @@ Mật khẩu: admin123
 - Trang thông báo/nhắc học có trạng thái đọc/chưa đọc.
 - Admin có thể gửi thông báo demo.
 - Trang cài đặt tài khoản cho phép sửa hồ sơ và tùy chọn học tập demo.
-- Admin studio cho phép tạo/xóa khóa học demo bằng localStorage.
+- Admin Studio cho phép tạo/xóa khóa học demo bằng localStorage.
 - Tìm kiếm khóa học trên trang danh sách khóa học.
 - Thanh điều hướng nhanh dưới màn hình cho mobile.
+- Trung tâm hỗ trợ học viên dạng ticket.
+- Admin xử lý ticket hỗ trợ demo.
+- Học viên gửi đánh giá khóa học.
+- Admin ẩn/hiện đánh giá.
+- Lịch học demo cho livestream, deadline và onboarding.
+- Admin thêm lịch học demo.
+- Báo cáo admin về học viên, quyền học, ticket và đánh giá.
+- Trang pháp lý mẫu gồm điều khoản, quyền riêng tư và hoàn tiền demo.
 - Trang backend/database mô tả bảng dữ liệu, API tối thiểu và checklist bảo mật.
 - Có workflow GitHub Pages cho web tĩnh.
+- Có file `.nojekyll` và `404.html`.
+- Có checklist kiểm thử `QA_CHECKLIST.md`.
 - Có nút reset dữ liệu demo.
 
 ## Cấu trúc file
@@ -99,7 +119,12 @@ hoctructuyen/
 ├── part3.js
 ├── part4.css
 ├── part4.js
+├── part5.css
+├── part5.js
+├── 404.html
+├── .nojekyll
 ├── README.md
+├── QA_CHECKLIST.md
 └── .github/workflows/static-pages.yml
 ```
 
@@ -118,7 +143,10 @@ hoctructuyen/
 11. Gửi câu hỏi bài học.
 12. Vào **Chứng chỉ** để xem điều kiện cấp chứng chỉ.
 13. Vào **Thông báo** để xem nhắc học.
-14. Vào **Cài đặt** bằng đường dẫn `#/settings` để sửa hồ sơ demo.
+14. Vào **Hỗ trợ** để gửi ticket.
+15. Vào **Đánh giá** bằng đường dẫn `#/reviews` để gửi đánh giá khóa học.
+16. Vào **Lịch học** để xem lịch live/deadline/onboarding.
+17. Vào **Cài đặt** bằng đường dẫn `#/settings` để sửa hồ sơ demo.
 
 ## Cách test luồng admin
 
@@ -128,7 +156,11 @@ hoctructuyen/
 4. Vào **Thông báo** để gửi thông báo demo.
 5. Vào `#/admin-content` để mở Admin Studio quản trị nội dung demo.
 6. Tạo khóa học demo và kiểm tra danh sách.
-7. Vào **Backend** để xem kế hoạch nối database/API thật.
+7. Vào **Hỗ trợ** để xử lý ticket học viên.
+8. Vào `#/reviews` để ẩn/hiện đánh giá.
+9. Vào **Lịch học** để thêm lịch demo.
+10. Vào `#/reports` để xem báo cáo admin.
+11. Vào **Backend** để xem kế hoạch nối database/API thật.
 
 ## GitHub Pages
 
@@ -152,6 +184,14 @@ Link dự kiến sau khi Pages hoạt động thường có dạng:
 https://tuvungonline-gif.github.io/hoctructuyen/
 ```
 
+## Checklist kiểm thử
+
+Xem file:
+
+```text
+QA_CHECKLIST.md
+```
+
 ## Lưu ý an toàn bắt buộc
 
 Bản này **chưa tích hợp backend thật**, vì vậy chưa được dùng để bảo vệ video thật hoặc thanh toán thật.
@@ -169,13 +209,17 @@ Các phần sau vẫn đang là demo frontend:
 - Ghi chú/hỏi đáp bài học.
 - Chứng chỉ.
 - Thông báo.
+- Hỗ trợ học viên.
+- Đánh giá khóa học.
+- Lịch học.
+- Báo cáo admin.
 
 Ở bản thật, các phần liên quan đến tài khoản, thanh toán, video và quyền truy cập phải được kiểm tra ở backend/API/server. Không được chỉ dựa vào localStorage hoặc frontend để bảo vệ video khóa học.
 
-## Phần tiếp theo nếu muốn chạy thương mại thật
+## Phần còn lại để thành sản phẩm thương mại thật
 
 1. Chọn backend: Node.js/Express, NestJS, Laravel hoặc Supabase.
-2. Thiết kế database thật cho users, courses, lessons, orders, enrollments, progress, questions, certificates.
+2. Thiết kế database thật cho users, courses, lessons, orders, enrollments, progress, questions, certificates, notifications, tickets, reviews.
 3. Tích hợp đăng nhập bảo mật.
 4. Tích hợp thanh toán và webhook.
 5. Bảo vệ video bằng signed URL/token có thời hạn.
