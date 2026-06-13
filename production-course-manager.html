@@ -50,20 +50,7 @@
       function log(value){$('status').textContent = typeof value === 'string' ? value : JSON.stringify(value,null,2)}
       function readJson(value){try{return JSON.parse(value || '{}')}catch(error){return {}}}
       function sessionToken(){return readJson(localStorage.getItem('eduvideo_production_session_v1') || sessionStorage.getItem('eduvideo_production_session_v1') || '{}').accessToken || ''}
-      function findSupabaseAccessToken(){
-        const stores = [localStorage, sessionStorage];
-        for(const store of stores){
-          for(let i=0;i<store.length;i+=1){
-            const key = store.key(i) || '';
-            if(!key.startsWith('sb-') || !key.includes('auth-token')) continue;
-            const data = readJson(store.getItem(key));
-            const accessToken = data.access_token || data.currentSession?.access_token || data.session?.access_token;
-            if(accessToken) return accessToken;
-          }
-        }
-        return '';
-      }
-      function token(){return sessionStorage.getItem('eduvideo_admin_access_token') || sessionToken() || findSupabaseAccessToken() || ''}
+      function token(){return sessionStorage.getItem('eduvideo_admin_access_token') || sessionToken() || ''}
       function authHeaders(){
         const accessToken = token();
         const headers = {'Content-Type':'application/json'};
@@ -78,7 +65,7 @@
       function loadLocal(){const data=readJson(localStorage.getItem('eduvideo_prod_course_manager'));Object.keys(data).forEach(k=>{if($(k))$(k).value=data[k]})}
       function friendlyError(message){
         if(message === 'Server returned non-JSON response') return 'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra API URL, route deploy hoặc biến môi trường.';
-        if(message === 'Admin permission required' || message === 'Login required' || /permission/i.test(message || '')) return 'Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Tài khoản admin phải có phiên Supabase Auth và profile role admin, status active.';
+        if(message === 'Admin permission required' || message === 'Login required' || /permission/i.test(message || '')) return 'Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Hãy đăng nhập tài khoản admin nội bộ hoặc cấu hình ADMIN_TOKEN.';
         return message || 'Có lỗi xảy ra. Vui lòng thử lại.';
       }
       async function jsonFetch(url, options){
@@ -92,7 +79,7 @@
       async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()});log(json)}catch(err){log('Lỗi: '+friendlyError(err.message))}}
       async function createCourseLessonAndUpload(){
         const file=$('videoFile').files[0];
-        if(!token()) {log('Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Vui lòng đăng nhập bằng tài khoản admin Supabase trước.');return;}
+        if(!token()) {log('Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Vui lòng đăng nhập admin ở trang chính trước.');return;}
         if(!$('courseTitle').value.trim()) return alert('Nhập tên khóa học.');
         if(!$('lessonTitle').value.trim()) return alert('Nhập tên bài học.');
         if(!file) return alert('Chọn video bài học.');
