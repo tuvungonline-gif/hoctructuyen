@@ -1,8 +1,8 @@
 # EduVideo - Website học trực tuyến qua video
 
-Đây là bản giao diện nền cho website học trực tuyến qua video, đã hoàn thành đến **Phần 3: checkout demo, đơn đăng ký, tài khoản học viên, quyền học, tiến độ học tập, ghi chú/hỏi đáp và khung chuẩn bị backend/database**.
+Đây là bản website học trực tuyến qua video ở mức **frontend hoàn thiện để demo/MVP**, đã có giao diện học viên, quản trị, checkout demo, quyền học, tiến độ học tập, ghi chú, hỏi đáp, dashboard, chứng chỉ demo, thông báo và khung chuẩn bị backend/database.
 
-## Cách chạy
+## Cách chạy local
 
 Mở trực tiếp file:
 
@@ -49,6 +49,11 @@ Mật khẩu: admin123
 7. Trang quản trị khóa học và quyền học cơ bản.
 8. Trang checkout demo.
 9. Trang kế hoạch backend/database.
+10. Trang dashboard học viên.
+11. Trang chứng chỉ demo.
+12. Trang thông báo/nhắc học.
+13. Trang cài đặt tài khoản.
+14. Trang admin studio quản trị nội dung demo.
 
 ## Chức năng đã có
 
@@ -71,10 +76,83 @@ Mật khẩu: admin123
 - Admin demo có thể xem đơn, xác nhận đơn và mở quyền học.
 - Học viên có thể lưu ghi chú cá nhân trong từng bài học.
 - Học viên có thể gửi câu hỏi trong từng bài học.
+- Dashboard học viên có thống kê tiến độ, khóa đang học và mục tiêu học tập.
+- Trang chứng chỉ demo theo điều kiện hoàn thành 100% khóa học.
+- Trang thông báo/nhắc học có trạng thái đọc/chưa đọc.
+- Admin có thể gửi thông báo demo.
+- Trang cài đặt tài khoản cho phép sửa hồ sơ và tùy chọn học tập demo.
+- Admin studio cho phép tạo/xóa khóa học demo bằng localStorage.
+- Tìm kiếm khóa học trên trang danh sách khóa học.
+- Thanh điều hướng nhanh dưới màn hình cho mobile.
 - Trang backend/database mô tả bảng dữ liệu, API tối thiểu và checklist bảo mật.
+- Có workflow GitHub Pages cho web tĩnh.
 - Có nút reset dữ liệu demo.
 
-## Lưu ý an toàn
+## Cấu trúc file
+
+```text
+hoctructuyen/
+├── index.html
+├── styles.css
+├── app.js
+├── part3.css
+├── part3.js
+├── part4.css
+├── part4.js
+├── README.md
+└── .github/workflows/static-pages.yml
+```
+
+## Cách test luồng học viên
+
+1. Đăng nhập học viên demo.
+2. Vào **Dashboard** để xem tổng quan học tập.
+3. Vào **Khóa học** và tìm kiếm khóa học.
+4. Mở chi tiết khóa học.
+5. Bấm **Đăng ký / mua khóa học**.
+6. Tạo đơn bằng checkout demo.
+7. Vào **Tài khoản** để xem đơn.
+8. Vào khóa đã mở quyền để học video.
+9. Đánh dấu bài đã học.
+10. Lưu ghi chú bài học.
+11. Gửi câu hỏi bài học.
+12. Vào **Chứng chỉ** để xem điều kiện cấp chứng chỉ.
+13. Vào **Thông báo** để xem nhắc học.
+14. Vào **Cài đặt** bằng đường dẫn `#/settings` để sửa hồ sơ demo.
+
+## Cách test luồng admin
+
+1. Đăng nhập admin demo.
+2. Vào **Quản trị** để xem học viên, quyền học và đơn đăng ký.
+3. Xác nhận đơn để mở quyền học.
+4. Vào **Thông báo** để gửi thông báo demo.
+5. Vào `#/admin-content` để mở Admin Studio quản trị nội dung demo.
+6. Tạo khóa học demo và kiểm tra danh sách.
+7. Vào **Backend** để xem kế hoạch nối database/API thật.
+
+## GitHub Pages
+
+Repo đã có workflow:
+
+```text
+.github/workflows/static-pages.yml
+```
+
+Để bật web chạy trực tiếp:
+
+1. Vào repo trên GitHub.
+2. Mở **Settings**.
+3. Vào **Pages**.
+4. Ở mục **Build and deployment**, chọn **GitHub Actions**.
+5. Chạy lại workflow nếu cần.
+
+Link dự kiến sau khi Pages hoạt động thường có dạng:
+
+```text
+https://tuvungonline-gif.github.io/hoctructuyen/
+```
+
+## Lưu ý an toàn bắt buộc
 
 Bản này **chưa tích hợp backend thật**, vì vậy chưa được dùng để bảo vệ video thật hoặc thanh toán thật.
 
@@ -89,33 +167,18 @@ Các phần sau vẫn đang là demo frontend:
 - Quản trị khóa học.
 - Đơn đăng ký/thanh toán.
 - Ghi chú/hỏi đáp bài học.
+- Chứng chỉ.
+- Thông báo.
 
 Ở bản thật, các phần liên quan đến tài khoản, thanh toán, video và quyền truy cập phải được kiểm tra ở backend/API/server. Không được chỉ dựa vào localStorage hoặc frontend để bảo vệ video khóa học.
 
-## Cấu trúc file
+## Phần tiếp theo nếu muốn chạy thương mại thật
 
-```text
-hoctructuyen/
-├── index.html
-├── styles.css
-├── app.js
-├── part3.css
-├── part3.js
-└── README.md
-```
-
-## Cách test phần 3
-
-1. Đăng nhập học viên demo.
-2. Vào một trang chi tiết khóa học.
-3. Bấm **Đăng ký / mua khóa học**.
-4. Tạo đơn bằng checkout demo.
-5. Vào **Tài khoản** để xem đơn.
-6. Đăng nhập admin demo.
-7. Vào **Quản trị** để xác nhận đơn và mở quyền học.
-8. Vào trang học video để test ghi chú và hỏi đáp.
-9. Vào menu **Backend** để xem kế hoạch nối database/API thật.
-
-## Gợi ý phần tiếp theo
-
-Phần tiếp theo nên làm: nối backend thật cho đăng nhập, database, thanh toán/webhook, bảo vệ video bằng server-side authorization và lưu tiến độ học thật.
+1. Chọn backend: Node.js/Express, NestJS, Laravel hoặc Supabase.
+2. Thiết kế database thật cho users, courses, lessons, orders, enrollments, progress, questions, certificates.
+3. Tích hợp đăng nhập bảo mật.
+4. Tích hợp thanh toán và webhook.
+5. Bảo vệ video bằng signed URL/token có thời hạn.
+6. Lưu tiến độ học thật trên server.
+7. Phân quyền admin/học viên bằng server-side authorization.
+8. Backup database trước mỗi lần deploy lớn.
