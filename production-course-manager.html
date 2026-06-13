@@ -21,11 +21,6 @@
     <main class="grid">
       <section>
         <div class="card">
-          <h2>Quyền quản trị</h2>
-          <div class="field"><label>Phiên quản trị</label><textarea id="adminToken" placeholder="Dán access token quản trị"></textarea></div>
-          <div class="actions"><button class="light" onclick="saveLocal()">Lưu phiên</button><button onclick="checkStatus()">Kiểm tra</button></div>
-        </div>
-        <div class="card">
           <h2>Thông tin khóa học</h2>
           <div class="field"><label>Tên khóa học</label><input id="courseTitle" placeholder="Nhập tên khóa học" /></div>
           <div class="field"><label>Mô tả</label><textarea id="courseDescription" placeholder="Nhập mô tả khóa học"></textarea></div>
@@ -53,15 +48,45 @@
     <script>
       function $(id){return document.getElementById(id)}
       function log(value){$('status').textContent = typeof value === 'string' ? value : JSON.stringify(value,null,2)}
-      function token(){return $('adminToken').value.trim()}
-      function authHeaders(){return {'Authorization':'Bearer '+token(),'Content-Type':'application/json'}}
-      function saveLocal(){const data={adminToken:token(),courseTitle:$('courseTitle').value,courseDescription:$('courseDescription').value,coursePrice:$('coursePrice').value,lessonTitle:$('lessonTitle').value,lessonDescription:$('lessonDescription').value};localStorage.setItem('eduvideo_prod_course_manager',JSON.stringify(data));log('Đã lưu phiên làm việc.')}
-      function loadLocal(){const data=JSON.parse(localStorage.getItem('eduvideo_prod_course_manager')||'{}');Object.keys(data).forEach(k=>{if($(k))$(k).value=data[k]})}
-      async function jsonFetch(url, options){const res=await fetch(url,options);const json=await res.json().catch(()=>({}));if(!res.ok)throw new Error(json.error||('HTTP '+res.status));return json}
-      async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()});log(json)}catch(err){log('Lỗi: '+err.message)}}
+      function readJson(value){try{return JSON.parse(value || '{}')}catch(error){return {}}}
+      function findSupabaseAccessToken(){
+        const stores = [localStorage, sessionStorage];
+        for(const store of stores){
+          for(let i=0;i<store.length;i+=1){
+            const key = store.key(i) || '';
+            if(!key.startsWith('sb-') || !key.includes('auth-token')) continue;
+            const data = readJson(store.getItem(key));
+            const accessToken = data.access_token || data.currentSession?.access_token || data.session?.access_token;
+            if(accessToken) return accessToken;
+          }
+        }
+        return '';
+      }
+      function token(){
+        const legacyData = readJson(localStorage.getItem('eduvideo_prod_course_manager'));
+        return sessionStorage.getItem('eduvideo_admin_access_token') || localStorage.getItem('eduvideo_admin_access_token') || findSupabaseAccessToken() || legacyData.adminToken || '';
+      }
+      function authHeaders(){
+        const accessToken = token();
+        const headers = {'Content-Type':'application/json'};
+        if(accessToken) headers.Authorization = 'Bearer '+accessToken;
+        return headers;
+      }
+      function saveLocal(){
+        const data={courseTitle:$('courseTitle').value,courseDescription:$('courseDescription').value,coursePrice:$('coursePrice').value,lessonTitle:$('lessonTitle').value,lessonDescription:$('lessonDescription').value};
+        localStorage.setItem('eduvideo_prod_course_manager',JSON.stringify(data));
+        log('Đã lưu thông tin đang nhập.');
+      }
+      function loadLocal(){const data=readJson(localStorage.getItem('eduvideo_prod_course_manager'));Object.keys(data).forEach(k=>{if(k !== 'adminToken' && $(k))$(k).value=data[k]})}
+      function friendlyError(message){
+        if(message === 'Admin permission required' || message === 'Login required' || /permission/i.test(message || '')) return 'Bạn không có quyền truy cập khu vực quản trị khóa học. Vui lòng đăng nhập bằng tài khoản admin.';
+        return message || 'Có lỗi xảy ra. Vui lòng thử lại.';
+      }
+      async function jsonFetch(url, options){const res=await fetch(url,options);const json=await res.json().catch(()=>({}));if(!res.ok)throw new Error(friendlyError(json.error||('HTTP '+res.status)));return json}
+      async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()});log(json)}catch(err){log('Lỗi: '+friendlyError(err.message))}}
       async function createCourseLessonAndUpload(){
         const file=$('videoFile').files[0];
-        if(!token()) return alert('Vui lòng nhập phiên quản trị.');
+        if(!token()) return alert('Bạn cần đăng nhập bằng tài khoản admin trước khi tạo khóa học.');
         if(!$('courseTitle').value.trim()) return alert('Nhập tên khóa học.');
         if(!$('lessonTitle').value.trim()) return alert('Nhập tên bài học.');
         if(!file) return alert('Chọn video bài học.');
@@ -81,7 +106,7 @@
           const attachResult=await jsonFetch('/api/admin/lessons/'+lesson.id+'/video',{method:'POST',headers:authHeaders(),body:JSON.stringify({r2Key:uploadMeta.key,videoProvider:'cloudflare-r2',contentType:file.type||'video/mp4',sizeBytes:file.size})});
           log({success:true,message:'Khóa học đã được tạo thành công.',course,lesson:attachResult.lesson});
           saveLocal();
-        }catch(err){log('Lỗi: '+err.message)}
+        }catch(err){log('Lỗi: '+friendlyError(err.message))}
       }
       loadLocal();
     </script>
