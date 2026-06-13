@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Production R2 Console - EduVideo</title>
+    <style>
+      :root { --primary:#2563eb; --border:#e2e8f0; --muted:#64748b; --text:#0f172a; --bg:#f8fafc; --danger:#dc2626; --success:#15803d; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: Arial, sans-serif; background:var(--bg); color:var(--text); }
+      header { padding:24px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+      main { max-width:1120px; margin:auto; padding:28px 18px 60px; }
+      h1 { margin:0 0 8px; font-size:clamp(2rem,4vw,3rem); }
+      h2 { margin:0 0 12px; }
+      p { color:var(--muted); line-height:1.55; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
+      .card { background:#fff; border:1px solid var(--border); border-radius:22px; padding:20px; box-shadow:0 18px 50px rgba(15,23,42,.06); }
+      .field { display:grid; gap:7px; margin-bottom:12px; }
+      label { font-weight:700; }
+      input, textarea { width:100%; min-height:46px; padding:12px 14px; border:1px solid var(--border); border-radius:14px; font-size:1rem; }
+      textarea { min-height:96px; font-family:monospace; }
+      button, a.btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 16px; border:0; border-radius:999px; background:var(--primary); color:#fff; font-weight:800; text-decoration:none; cursor:pointer; }
+      button.secondary { background:#e2e8f0; color:#0f172a; }
+      .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+      .status { padding:12px 14px; border-radius:14px; background:#f8fafc; border:1px solid var(--border); white-space:pre-wrap; overflow:auto; max-height:260px; }
+      .ok { color:var(--success); font-weight:800; }
+      .bad { color:var(--danger); font-weight:800; }
+      video { width:100%; border-radius:18px; background:#000; margin-top:14px; }
+      .full { grid-column:1/-1; }
+      @media(max-width:820px){ .grid{grid-template-columns:1fr;} }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Production R2 Console</h1>
+      <p>Trang này dùng để upload video lên Cloudflare R2, gắn video vào lesson và test signed URL xem video. Không nhập R2 secret ở đây.</p>
+      <div class="actions"><a class="btn" href="/#/admin">Về quản trị</a><a class="btn" href="/api/config" target="_blank">Kiểm tra /api/config</a></div>
+    </header>
+
+    <main class="grid">
+      <section class="card full">
+        <h2>1. Cấu hình chung</h2>
+        <div class="field"><label>Base URL Railway</label><input id="baseUrl" placeholder="https://domain.up.railway.app" /></div>
+        <div class="field"><label>Admin Supabase Access Token</label><textarea id="adminToken" placeholder="Dán access token của tài khoản admin"></textarea></div>
+        <div class="actions"><button onclick="checkConfig()">Kiểm tra cấu hình</button><button class="secondary" onclick="saveLocal()">Lưu tạm trên trình duyệt</button></div>
+        <pre id="configStatus" class="status">Chưa kiểm tra.</pre>
+      </section>
+
+      <section class="card">
+        <h2>2. Tạo link upload video</h2>
+        <div class="field"><label>Course ID</label><input id="courseId" placeholder="UUID khóa học trong Supabase" /></div>
+        <div class="field"><label>Lesson ID</label><input id="lessonId" placeholder="UUID bài học trong Supabase" /></div>
+        <div class="field"><label>File video</label><input id="videoFile" type="file" accept="video/*" /></div>
+        <div class="actions"><button onclick="createUploadUrl()">Tạo signed upload URL</button><button onclick="uploadVideo()">Upload video lên R2</button></div>
+        <pre id="uploadStatus" class="status">Chưa upload.</pre>
+      </section>
+
+      <section class="card">
+        <h2>3. Gắn video vào lesson</h2>
+        <div class="field"><label>R2 Key</label><textarea id="r2Key" placeholder="Tự điền sau khi tạo upload URL hoặc dán key"></textarea></div>
+        <div class="actions"><button onclick="attachVideo()">Gắn video vào lesson</button></div>
+        <pre id="attachStatus" class="status">Chưa gắn video.</pre>
+      </section>
+
+      <section class="card full">
+        <h2>4. Test học viên xem video</h2>
+        <p>Học viên phải có enrollment active hoặc bài học là preview.</p>
+        <div class="field"><label>Student Supabase Access Token</label><textarea id="studentToken" placeholder="Dán access token của học viên có quyền học"></textarea></div>
+        <div class="field"><label>Lesson ID cần xem</label><input id="watchLessonId" placeholder="UUID bài học" /></div>
+        <div class="actions"><button onclick="getVideoUrl()">Lấy signed URL xem video</button></div>
+        <pre id="watchStatus" class="status">Chưa test xem video.</pre>
+        <video id="player" controls playsinline></video>
+      </section>
+    </main>
+
+    <script>
+      let uploadUrl = "";
+      function $(id){ return document.getElementById(id); }
+      function base(){ return ($('baseUrl').value || window.location.origin).replace(/\/$/, ''); }
+      function out(id, value){ $(id).textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2); }
+      function headers(token){ return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+
+      function loadLocal(){
+        const saved = JSON.parse(localStorage.getItem('eduvideo_r2_console') || '{}');
+        ['baseUrl','adminToken','courseId','lessonId','r2Key','studentToken','watchLessonId'].forEach(id => { if(saved[id]) $(id).value = saved[id]; });
+      }
+      function saveLocal(){
+        const data = {};
+        ['baseUrl','adminToken','courseId','lessonId','r2Key','studentToken','watchLessonId'].forEach(id => data[id] = $(id).value);
+        localStorage.setItem('eduvideo_r2_console', JSON.stringify(data));
+        alert('Đã lưu tạm trên trình duyệt này. Không dùng máy lạ để lưu token.');
+      }
+
+      async function checkConfig(){
+        try{
+          const res = await fetch(base() + '/api/config', { cache:'no-store' });
+          const json = await res.json();
+          out('configStatus', json);
+        }catch(err){ out('configStatus', 'Lỗi: ' + err.message); }
+      }
+
+      async function createUploadUrl(){
+        const file = $('videoFile').files[0];
+        if(!file){ alert('Chọn file video trước.'); return; }
+        const body = { courseId:$('courseId').value, lessonId:$('lessonId').value, fileName:file.name, contentType:file.type || 'video/mp4' };
+        try{
+          const res = await fetch(base() + '/api/admin/r2/presign-upload', { method:'POST', headers:headers($('adminToken').value), body:JSON.stringify(body) });
+          const json = await res.json();
+          if(!res.ok) throw new Error(json.error || 'Không tạo được upload URL');
+          uploadUrl = json.uploadUrl;
+          $('r2Key').value = json.key;
+          out('uploadStatus', json);
+          saveLocal();
+        }catch(err){ out('uploadStatus', 'Lỗi: ' + err.message); }
+      }
+
+      async function uploadVideo(){
+        const file = $('videoFile').files[0];
+        if(!file){ alert('Chọn file video trước.'); return; }
+        if(!uploadUrl){ alert('Tạo signed upload URL trước.'); return; }
+        try{
+          out('uploadStatus', 'Đang upload, vui lòng chờ...');
+          const res = await fetch(uploadUrl, { method:'PUT', headers:{ 'Content-Type': file.type || 'video/mp4' }, body:file });
+          if(!res.ok) throw new Error('Upload lỗi HTTP ' + res.status);
+          out('uploadStatus', 'Upload thành công lên R2. Bước tiếp theo: bấm Gắn video vào lesson.');
+        }catch(err){ out('uploadStatus', 'Lỗi: ' + err.message); }
+      }
+
+      async function attachVideo(){
+        const lessonId = $('lessonId').value;
+        const r2Key = $('r2Key').value.trim();
+        try{
+          const res = await fetch(base() + '/api/admin/lessons/' + lessonId + '/video', { method:'POST', headers:headers($('adminToken').value), body:JSON.stringify({ r2Key, videoProvider:'cloudflare-r2' }) });
+          const json = await res.json();
+          if(!res.ok) throw new Error(json.error || 'Không gắn được video');
+          out('attachStatus', json);
+        }catch(err){ out('attachStatus', 'Lỗi: ' + err.message); }
+      }
+
+      async function getVideoUrl(){
+        const lessonId = $('watchLessonId').value || $('lessonId').value;
+        try{
+          const res = await fetch(base() + '/api/video/' + lessonId + '/signed-url', { method:'POST', headers:{ 'Authorization':'Bearer ' + $('studentToken').value } });
+          const json = await res.json();
+          if(!res.ok) throw new Error(json.error || 'Không lấy được video URL');
+          out('watchStatus', json);
+          $('player').src = json.videoUrl;
+          $('player').load();
+        }catch(err){ out('watchStatus', 'Lỗi: ' + err.message); }
+      }
+      loadLocal();
+    </script>
+  </body>
+</html>
