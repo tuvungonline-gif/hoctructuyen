@@ -31,11 +31,17 @@ app.disable("x-powered-by");
 
 app.use(function corsMiddleware(req, res, next) {
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.size === 0 || allowedOrigins.has(origin))) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  const allowed = origin && (allowedOrigins.size === 0 || allowedOrigins.has(origin));
+  if (origin) {
+    if (allowed) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+      res.setHeader("Access-Control-Max-Age", "86400");
+    } else {
+      console.warn(`[CORS] Blocked origin: ${origin} — not in CORS_ORIGINS (${[...allowedOrigins].join(", ") || "none configured"})`);
+    }
   }
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -492,9 +498,10 @@ app.post("/api/admin/courses/:courseId/lessons", requireAdmin, function (req, re
 });
 
 app.post("/api/admin/r2/upload-proxy", requireAdmin, async function (req, res) {
+  const uploadStart = Date.now();
   try {
     if (!r2Client || !r2Bucket) {
-      res.status(500).json({ error: "R2 is not configured" });
+      res.status(500).json({ error: "R2 is not configured — set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME" });
       return;
     }
     const courseId = String(req.query.courseId || "").trim();
@@ -502,16 +509,26 @@ app.post("/api/admin/r2/upload-proxy", requireAdmin, async function (req, res) {
     const fileName = String(req.query.fileName || "video.mp4").trim();
     const contentType = String(req.headers["content-type"] || req.query.contentType || "video/mp4");
     if (!courseId || !lessonId || !fileName) {
-      res.status(400).json({ error: "courseId, lessonId and fileName are required" });
+      res.status(400).json({ error: "courseId, lessonId and fileName are required query parameters" });
       return;
     }
     const lesson = store.lessons.find((item) => item.id === lessonId && item.course_id === courseId);
     if (!lesson) {
-      res.status(404).json({ error: "Lesson not found for this course" });
+      res.status(404).json({ error: `Lesson '${lessonId}' not found for course '${courseId}'` });
+      return;
+    }
+    const contentLength = Number(req.headers["content-length"] || 0);
+    const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+    if (contentLength > MAX_UPLOAD_BYTES) {
+      res.status(413).json({ error: `File too large: ${(contentLength / 1024 / 1024).toFixed(1)} MB. Maximum allowed size is 2 GB.` });
       return;
     }
     const key = videoKey({ courseId, lessonId, fileName });
-    const contentLength = Number(req.headers["content-length"] || 0);
+    console.log(`[upload-proxy] Starting upload: lesson=${lessonId} file=${fileName} size=${contentLength > 0 ? (contentLength / 1024 / 1024).toFixed(1) + " MB" : "unknown"} key=${key}`);
+
+    // Set a generous socket timeout for large uploads (30 minutes)
+    req.socket.setTimeout(30 * 60 * 1000);
+
     await r2Client.send(new PutObjectCommand({
       Bucket: r2Bucket,
       Key: key,
@@ -519,9 +536,27 @@ app.post("/api/admin/r2/upload-proxy", requireAdmin, async function (req, res) {
       ContentType: contentType,
       ...(contentLength > 0 ? { ContentLength: contentLength } : {})
     }));
-    res.json({ key, publicUrl: publicR2Url(key), sizeBytes: contentLength || null, uploadMode: "backend-proxy" });
+
+    const elapsed = ((Date.now() - uploadStart) / 1000).toFixed(1);
+    console.log(`[upload-proxy] Upload complete: key=${key} elapsed=${elapsed}s`);
+    res.json({ key, publicUrl: publicR2Url(key), sizeBytes: contentLength || null, uploadMode: "backend-proxy", elapsedSeconds: Number(elapsed) });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Could not upload video through backend" });
+    const elapsed = ((Date.now() - uploadStart) / 1000).toFixed(1);
+    const errMsg = error.message || "Unknown error";
+    console.error(`[upload-proxy] Upload failed after ${elapsed}s:`, errMsg, error.code ? `(code: ${error.code})` : "");
+    if (error.name === "TimeoutError" || error.code === "ETIMEDOUT" || error.code === "ESOCKETTIMEDOUT") {
+      res.status(504).json({ error: `Upload timed out after ${elapsed}s. Try a smaller file or check your network connection.` });
+      return;
+    }
+    if (error.name === "NoSuchBucket" || error.Code === "NoSuchBucket") {
+      res.status(500).json({ error: `R2 bucket '${r2Bucket}' not found. Check R2_BUCKET_NAME environment variable.` });
+      return;
+    }
+    if (error.name === "InvalidAccessKeyId" || error.Code === "InvalidAccessKeyId") {
+      res.status(500).json({ error: "R2 credentials are invalid. Check R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY." });
+      return;
+    }
+    res.status(500).json({ error: `Upload failed: ${errMsg}` });
   }
 });
 
@@ -608,6 +643,13 @@ app.delete("/api/admin/r2/object", requireAdmin, async function (req, res) {
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not delete R2 object" });
   }
+});
+
+app.use(function apiErrorLogger(error, req, res, next) {
+  if (req.path.startsWith("/api")) {
+    console.error(`[api-error] ${req.method} ${req.originalUrl} — ${error.status || 500}: ${error.message || "Internal server error"}`);
+  }
+  next(error);
 });
 
 app.use(function finalApiErrorHandler(error, req, res, next) {
