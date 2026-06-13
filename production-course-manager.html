@@ -3,56 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tạo khóa học production - EduVideo</title>
+    <title>Tạo khóa học - EduVideo</title>
     <style>
-      :root{--primary:#2563eb;--accent:#f59e0b;--border:#e2e8f0;--muted:#64748b;--text:#0f172a;--bg:#f8fafc;--ok:#15803d;--bad:#dc2626}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}header{padding:24px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}main{max-width:1120px;margin:auto;padding:26px 18px 60px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}h1{margin:0 0 8px;font-size:clamp(2rem,4vw,3rem)}h2{margin:0 0 12px}p{color:var(--muted);line-height:1.55}.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start}.card{background:#fff;border:1px solid var(--border);border-radius:22px;padding:20px;box-shadow:0 18px 50px rgba(15,23,42,.06);margin-bottom:18px}.field{display:grid;gap:7px;margin-bottom:12px}label{font-weight:800}input,textarea,select{width:100%;min-height:46px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;font-size:1rem;background:#fff}textarea{min-height:90px}button,a.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 16px;border:0;border-radius:999px;background:var(--primary);color:#fff;font-weight:900;text-decoration:none;cursor:pointer}.btn.light,button.light{background:#e2e8f0;color:#0f172a}.btn.accent,button.accent{background:var(--accent);color:#111827}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.status{padding:14px;border-radius:16px;background:#f8fafc;border:1px solid var(--border);white-space:pre-wrap;overflow:auto;max-height:360px;font-family:Consolas,monospace}.step{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:16px;margin-bottom:10px;background:#fff}.step span{width:28px;height:28px;border-radius:999px;background:#eff6ff;color:#1d4ed8;display:grid;place-items:center;font-weight:900;flex:0 0 auto}.ok{color:var(--ok);font-weight:900}.bad{color:var(--bad);font-weight:900}.small{font-size:.9rem;color:var(--muted)}@media(max-width:900px){.grid,.hero{grid-template-columns:1fr;display:grid}.actions a,.actions button{width:100%}}
+      :root{--primary:#2563eb;--accent:#f59e0b;--border:#e2e8f0;--muted:#64748b;--text:#0f172a;--bg:#f8fafc;--ok:#15803d;--bad:#dc2626}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}header{padding:24px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}main{max-width:1040px;margin:auto;padding:26px 18px 60px}.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}h1{margin:0 0 8px;font-size:clamp(2rem,4vw,3rem);letter-spacing:-.05em}h2{margin:0 0 16px;font-size:1.35rem}p{color:var(--muted);line-height:1.55}.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}.card{background:#fff;border:1px solid var(--border);border-radius:22px;padding:22px;box-shadow:0 18px 50px rgba(15,23,42,.06);margin-bottom:18px}.field{display:grid;gap:7px;margin-bottom:14px}label{font-weight:800}input,textarea,select{width:100%;min-height:48px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;font-size:1rem;background:#fff}textarea{min-height:92px;resize:vertical}button,a.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;border:0;border-radius:999px;background:var(--primary);color:#fff;font-weight:900;text-decoration:none;cursor:pointer}.btn.light,button.light{background:#e2e8f0;color:#0f172a}.btn.accent,button.accent{background:var(--accent);color:#111827}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.status{padding:16px;border-radius:16px;background:#0f172a;color:#e2e8f0;border:1px solid #1e293b;white-space:pre-wrap;overflow:auto;max-height:420px;font-family:Consolas,monospace}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.checkline{display:flex;gap:10px;align-items:center;font-weight:800}.checkline input{width:auto;min-height:auto}.top-note{margin:0;color:#475569}.success-title{color:var(--ok);font-weight:900}.error-title{color:var(--bad);font-weight:900}@media(max-width:900px){.grid,.hero,.two{grid-template-columns:1fr;display:grid}.actions a,.actions button{width:100%}}
     </style>
   </head>
   <body>
     <header>
       <div class="hero">
         <div>
-          <h1>Tạo khóa học + Upload video R2</h1>
-          <p>Một luồng tự động: tạo khóa học trong Supabase, tạo bài học, upload video lên Cloudflare R2, rồi gắn video vào bài học.</p>
+          <h1>Tạo khóa học</h1>
+          <p class="top-note">Tạo khóa học, bài học và upload video lên Cloudflare R2.</p>
         </div>
-        <div class="actions"><a class="btn light" href="/#/admin">Về quản trị</a><a class="btn light" href="/api/config" target="_blank">Kiểm tra config</a></div>
+        <div class="actions"><a class="btn light" href="/#/admin">Về quản trị</a></div>
       </div>
     </header>
     <main class="grid">
       <section>
         <div class="card">
-          <h2>1. Quyền admin</h2>
-          <div class="field"><label>Admin Supabase Access Token</label><textarea id="adminToken" placeholder="Dán access token của tài khoản admin"></textarea></div>
-          <p class="small">Token chỉ lưu tạm trên trình duyệt của bạn. Không dùng máy lạ để lưu token.</p>
-          <div class="actions"><button class="light" onclick="saveLocal()">Lưu tạm</button><button onclick="checkStatus()">Kiểm tra quyền admin</button></div>
+          <h2>Quyền quản trị</h2>
+          <div class="field"><label>Phiên quản trị</label><textarea id="adminToken" placeholder="Dán access token quản trị"></textarea></div>
+          <div class="actions"><button class="light" onclick="saveLocal()">Lưu phiên</button><button onclick="checkStatus()">Kiểm tra</button></div>
         </div>
         <div class="card">
-          <h2>2. Thông tin khóa học</h2>
-          <div class="field"><label>Tên khóa học</label><input id="courseTitle" placeholder="Ví dụ: Khóa học bán hàng online" /></div>
-          <div class="field"><label>Mô tả khóa học</label><textarea id="courseDescription" placeholder="Mô tả ngắn về khóa học"></textarea></div>
-          <div class="field"><label>Giá khóa học</label><input id="coursePrice" type="number" value="0" min="0" /></div>
-          <div class="field"><label>Trạng thái</label><select id="courseStatus"><option value="published">Xuất bản</option><option value="draft">Bản nháp</option></select></div>
+          <h2>Thông tin khóa học</h2>
+          <div class="field"><label>Tên khóa học</label><input id="courseTitle" placeholder="Nhập tên khóa học" /></div>
+          <div class="field"><label>Mô tả</label><textarea id="courseDescription" placeholder="Nhập mô tả khóa học"></textarea></div>
+          <div class="two">
+            <div class="field"><label>Học phí</label><input id="coursePrice" type="number" value="0" min="0" /></div>
+            <div class="field"><label>Trạng thái</label><select id="courseStatus"><option value="published">Xuất bản</option><option value="draft">Bản nháp</option></select></div>
+          </div>
         </div>
         <div class="card">
-          <h2>3. Bài học và video</h2>
-          <div class="field"><label>Tên bài học</label><input id="lessonTitle" placeholder="Ví dụ: Bài 1 - Tổng quan" /></div>
-          <div class="field"><label>Mô tả bài học</label><textarea id="lessonDescription" placeholder="Mô tả nội dung bài học"></textarea></div>
-          <div class="field"><label>Video bài học</label><input id="videoFile" type="file" accept="video/*" /></div>
-          <div class="field"><label><input id="isPreview" type="checkbox" style="width:auto;min-height:auto" /> Cho xem thử miễn phí</label></div>
-          <div class="actions"><button class="accent" onclick="createCourseLessonAndUpload()">Tạo khóa học + Upload video</button></div>
+          <h2>Bài học đầu tiên</h2>
+          <div class="field"><label>Tên bài học</label><input id="lessonTitle" placeholder="Nhập tên bài học" /></div>
+          <div class="field"><label>Mô tả bài học</label><textarea id="lessonDescription" placeholder="Nhập mô tả bài học"></textarea></div>
+          <div class="field"><label>Video</label><input id="videoFile" type="file" accept="video/*" /></div>
+          <label class="checkline"><input id="isPreview" type="checkbox" /> Cho xem thử miễn phí</label>
+          <div class="actions"><button class="accent" onclick="createCourseLessonAndUpload()">Tạo khóa học</button></div>
         </div>
       </section>
       <aside>
         <div class="card">
-          <h2>Quy trình tự động</h2>
-          <div class="step"><span>1</span><div><strong>Tạo course</strong><p>Ghi khóa học vào bảng courses.</p></div></div>
-          <div class="step"><span>2</span><div><strong>Tạo lesson</strong><p>Ghi bài học vào bảng lessons.</p></div></div>
-          <div class="step"><span>3</span><div><strong>Upload R2</strong><p>Tạo signed URL và upload video lên R2.</p></div></div>
-          <div class="step"><span>4</span><div><strong>Gắn video</strong><p>Lưu R2 key vào lesson.</p></div></div>
-        </div>
-        <div class="card">
-          <h2>Trạng thái</h2>
-          <pre id="status" class="status">Chưa thực hiện.</pre>
+          <h2>Trạng thái xử lý</h2>
+          <pre id="status" class="status">Sẵn sàng.</pre>
         </div>
       </aside>
     </main>
@@ -61,37 +55,31 @@
       function log(value){$('status').textContent = typeof value === 'string' ? value : JSON.stringify(value,null,2)}
       function token(){return $('adminToken').value.trim()}
       function authHeaders(){return {'Authorization':'Bearer '+token(),'Content-Type':'application/json'}}
-      function saveLocal(){const data={adminToken:token(),courseTitle:$('courseTitle').value,courseDescription:$('courseDescription').value,coursePrice:$('coursePrice').value,lessonTitle:$('lessonTitle').value,lessonDescription:$('lessonDescription').value};localStorage.setItem('eduvideo_prod_course_manager',JSON.stringify(data));alert('Đã lưu tạm trên trình duyệt này.')}
+      function saveLocal(){const data={adminToken:token(),courseTitle:$('courseTitle').value,courseDescription:$('courseDescription').value,coursePrice:$('coursePrice').value,lessonTitle:$('lessonTitle').value,lessonDescription:$('lessonDescription').value};localStorage.setItem('eduvideo_prod_course_manager',JSON.stringify(data));log('Đã lưu phiên làm việc.')}
       function loadLocal(){const data=JSON.parse(localStorage.getItem('eduvideo_prod_course_manager')||'{}');Object.keys(data).forEach(k=>{if($(k))$(k).value=data[k]})}
       async function jsonFetch(url, options){const res=await fetch(url,options);const json=await res.json().catch(()=>({}));if(!res.ok)throw new Error(json.error||('HTTP '+res.status));return json}
       async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()});log(json)}catch(err){log('Lỗi: '+err.message)}}
       async function createCourseLessonAndUpload(){
         const file=$('videoFile').files[0];
-        if(!token()) return alert('Vui lòng dán Admin Supabase Access Token.');
+        if(!token()) return alert('Vui lòng nhập phiên quản trị.');
         if(!$('courseTitle').value.trim()) return alert('Nhập tên khóa học.');
         if(!$('lessonTitle').value.trim()) return alert('Nhập tên bài học.');
         if(!file) return alert('Chọn video bài học.');
         try{
-          log('Bước 1/4: Đang tạo khóa học...');
+          log('Đang tạo khóa học...');
           const courseResult=await jsonFetch('/api/admin/courses',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:$('courseTitle').value,description:$('courseDescription').value,price:Number($('coursePrice').value||0),status:$('courseStatus').value})});
           const course=courseResult.course;
-          log({step:'Đã tạo khóa học',course});
-
-          log('Bước 2/4: Đang tạo bài học...');
+          log('Đang tạo bài học...');
           const lessonResult=await jsonFetch('/api/admin/courses/'+course.id+'/lessons',{method:'POST',headers:authHeaders(),body:JSON.stringify({title:$('lessonTitle').value,description:$('lessonDescription').value,isPreview:$('isPreview').checked,status:'published',sortOrder:1})});
           const lesson=lessonResult.lesson;
-          log({step:'Đã tạo bài học',course,lesson});
-
-          log('Bước 3/4: Đang tạo signed URL upload R2...');
+          log('Đang chuẩn bị upload video...');
           const uploadMeta=await jsonFetch('/api/admin/r2/presign-upload',{method:'POST',headers:authHeaders(),body:JSON.stringify({courseId:course.id,lessonId:lesson.id,fileName:file.name,contentType:file.type||'video/mp4'})});
-          log({step:'Đã tạo upload URL, đang upload video lên R2...',r2Key:uploadMeta.key});
-
+          log('Đang upload video lên R2...');
           const uploadRes=await fetch(uploadMeta.uploadUrl,{method:'PUT',headers:{'Content-Type':file.type||'video/mp4'},body:file});
           if(!uploadRes.ok) throw new Error('Upload R2 lỗi HTTP '+uploadRes.status);
-
-          log('Bước 4/4: Upload xong. Đang gắn video vào lesson...');
+          log('Đang gắn video vào bài học...');
           const attachResult=await jsonFetch('/api/admin/lessons/'+lesson.id+'/video',{method:'POST',headers:authHeaders(),body:JSON.stringify({r2Key:uploadMeta.key,videoProvider:'cloudflare-r2',contentType:file.type||'video/mp4',sizeBytes:file.size})});
-          log({success:true,message:'Đã tạo khóa học, tạo bài học, upload video lên R2 và gắn video thành công.',course,lesson:attachResult.lesson,r2Key:uploadMeta.key});
+          log({success:true,message:'Khóa học đã được tạo thành công.',course,lesson:attachResult.lesson});
           saveLocal();
         }catch(err){log('Lỗi: '+err.message)}
       }
