@@ -316,6 +316,10 @@ function userHasLessonAccess(userId, lessonId) {
   return store.enrollments.some((enrollment) => enrollment.user_id === userId && enrollment.course_id === lesson.course_id && enrollment.status === "active");
 }
 
+function publicR2Url(key) {
+  return r2PublicUrl ? `${r2PublicUrl.replace(/\/$/, "")}/${key}` : "";
+}
+
 app.get("/health", function (req, res) {
   res.status(200).json({ ok: true, service: "eduvideo", authMode: "local", dataMode: "local-json" });
 });
@@ -327,6 +331,7 @@ app.get("/api/config", function (req, res) {
     dataMode: "local-json",
     r2Ready: Boolean(r2Client && r2Bucket),
     videoMode: r2Client && r2Bucket ? "r2-signed-url" : "demo",
+    uploadMode: r2Client && r2Bucket ? "backend-proxy",
     adminTokenEnabled: Boolean(adminToken)
   });
 });
@@ -397,7 +402,7 @@ app.get("/api/courses/:courseId", function (req, res) {
 });
 
 app.get("/api/admin/status", requireAdmin, function (req, res) {
-  res.json({ ok: true, authMode: "local", dataMode: "local-json", r2Ready: Boolean(r2Client && r2Bucket) });
+  res.json({ ok: true, authMode: "local", dataMode: "local-json", r2Ready: Boolean(r2Client && r2Bucket), uploadMode: r2Client && r2Bucket ? "backend-proxy" : "demo" });
 });
 
 app.get("/api/admin/courses", requireAdmin, function (req, res) {
@@ -486,6 +491,40 @@ app.post("/api/admin/courses/:courseId/lessons", requireAdmin, function (req, re
   }
 });
 
+app.post("/api/admin/r2/upload-proxy", requireAdmin, async function (req, res) {
+  try {
+    if (!r2Client || !r2Bucket) {
+      res.status(500).json({ error: "R2 is not configured" });
+      return;
+    }
+    const courseId = String(req.query.courseId || "").trim();
+    const lessonId = String(req.query.lessonId || "").trim();
+    const fileName = String(req.query.fileName || "video.mp4").trim();
+    const contentType = String(req.headers["content-type"] || req.query.contentType || "video/mp4");
+    if (!courseId || !lessonId || !fileName) {
+      res.status(400).json({ error: "courseId, lessonId and fileName are required" });
+      return;
+    }
+    const lesson = store.lessons.find((item) => item.id === lessonId && item.course_id === courseId);
+    if (!lesson) {
+      res.status(404).json({ error: "Lesson not found for this course" });
+      return;
+    }
+    const key = videoKey({ courseId, lessonId, fileName });
+    const contentLength = Number(req.headers["content-length"] || 0);
+    await r2Client.send(new PutObjectCommand({
+      Bucket: r2Bucket,
+      Key: key,
+      Body: req,
+      ContentType: contentType,
+      ...(contentLength > 0 ? { ContentLength: contentLength } : {})
+    }));
+    res.json({ key, publicUrl: publicR2Url(key), sizeBytes: contentLength || null, uploadMode: "backend-proxy" });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not upload video through backend" });
+  }
+});
+
 app.post("/api/admin/r2/presign-upload", requireAdmin, async function (req, res) {
   try {
     if (!r2Client || !r2Bucket) {
@@ -504,7 +543,7 @@ app.post("/api/admin/r2/presign-upload", requireAdmin, async function (req, res)
       ContentType: contentType || "video/mp4"
     });
     const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 900 });
-    res.json({ uploadUrl, key, expiresIn: 900, publicUrl: r2PublicUrl ? `${r2PublicUrl.replace(/\/$/, "")}/${key}` : "" });
+    res.json({ uploadUrl, key, expiresIn: 900, publicUrl: publicR2Url(key) });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not create upload URL" });
   }
