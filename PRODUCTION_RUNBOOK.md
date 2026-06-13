@@ -1,82 +1,107 @@
 # Production Runbook - EduVideo LMS
 
-## Mục tiêu bản vá
+## Mục tiêu bản hiện tại
 
-Bản vá này giữ nguyên luồng UI/demo hiện tại, nhưng bổ sung lớp chạy production để giảm lỗi khi deploy thật:
+Bản này đã loại bỏ Supabase khỏi website. Backend hiện dùng:
 
-- API sai route không còn trả về `index.html` gây lỗi `Unexpected token ... is not valid JSON`.
-- Backend có CORS cấu hình được qua biến môi trường.
-- Backend có đăng nhập/đăng ký Supabase cơ bản.
-- Backend có API public để lấy khóa học đã xuất bản từ Supabase.
-- Frontend có lớp bắt lỗi global để tránh trắng màn hình.
-- Frontend có cơ chế đọc API an toàn khi backend trả HTML/text thay vì JSON.
-- Trang tạo khóa học và R2 console không lưu token quản trị dài hạn vào localStorage.
+- Node.js/Express.
+- Local JSON store để lưu user, course, lesson, enrollment.
+- Mật khẩu hash bằng `crypto.scryptSync`, không lưu mật khẩu thô ở backend.
+- Session token nội bộ cho đăng nhập.
+- Cloudflare R2 cho upload/video signed URL nếu được cấu hình.
+
+Luồng UI/demo cũ vẫn được giữ để không phá giao diện, nhưng khi backend local chạy sẵn, frontend sẽ gọi API nội bộ thay vì gọi Supabase.
 
 ## File đã sửa/thêm
 
 ### `server.js`
 
-Đã thêm/sửa:
+Đã gỡ toàn bộ Supabase:
 
-- CORS middleware dùng `CORS_ORIGINS` hoặc `APP_BASE_URL`.
-- JSON parse error handler trả JSON `{ error: "Invalid JSON request body" }`.
-- `POST /api/auth/register` để tạo tài khoản Supabase bằng service role.
-- `GET /api/auth/me` để kiểm tra session/token hiện tại.
-- `GET /api/courses` để lấy khóa học published từ Supabase.
-- `GET /api/courses/:courseId` để lấy chi tiết khóa học.
-- `/api/*` 404 trả JSON thay vì fallback sang SPA HTML.
-- Chặn serve static các file nhạy cảm: `server.js`, `package.json`, `.env`, `.github`, `.git`.
+- Xóa import `@supabase/supabase-js`.
+- Xóa `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+- Xóa logic profile/admin từ Supabase.
+- Thay bằng local JSON store tại `DATA_DIR` / `DATA_FILE`.
+- Thêm seed dữ liệu ban đầu cho học viên demo, admin demo, khóa học, bài học, enrollment.
+- Thêm hash mật khẩu bằng `crypto.scryptSync`.
+- Thêm session token nội bộ.
+- Admin được xác thực bằng tài khoản admin nội bộ hoặc biến môi trường `ADMIN_TOKEN`.
+- API `/api/*` vẫn trả JSON rõ ràng, tránh lỗi `Unexpected token ... is not valid JSON`.
+- Chặn serve `/data`, `.env`, `.git`, `.github`, `server.js`, `package.json`.
 
-### `index.html`
+### `package.json`
 
-Đã thêm:
+Đã gỡ:
 
-```html
-<script src="production-hardening.js"></script>
+- `@supabase/supabase-js`
+- `pg`
+
+Dependencies hiện chỉ còn:
+
+```json
+{
+  "@aws-sdk/client-s3": "^3.726.1",
+  "@aws-sdk/s3-request-presigner": "^3.726.1",
+  "express": "^4.19.2"
+}
 ```
 
 ### `production-hardening.js`
 
-File mới, có nhiệm vụ:
+Đã cập nhật:
 
-- Bắt lỗi `window.error` và `unhandledrejection`.
-- Vá fetch cho các request `/api/*` để phát hiện server trả non-JSON.
-- Hiển thị thông báo lỗi thân thiện thay vì trắng màn hình.
-- Khi `SUPABASE_URL` và `SUPABASE_ANON_KEY` đã cấu hình, form đăng nhập/đăng ký sẽ gọi API thật.
-- Lưu session production và restore sau khi reload.
-- Đồng bộ danh sách khóa học từ `/api/courses` nếu API production sẵn sàng.
-- Fallback khi ảnh/video lỗi.
+- Không còn nhắc Supabase.
+- Đăng nhập/đăng ký gọi backend local.
+- Restore session qua `/api/auth/me`.
+- Đồng bộ khóa học qua `/api/courses`.
+- Báo lỗi admin bằng hướng dẫn đăng nhập admin nội bộ hoặc `ADMIN_TOKEN`.
 
 ### `production-course-manager.html`
 
-Đã sửa:
+Đã cập nhật:
 
-- Không còn đọc `res.json()` trực tiếp.
-- Đọc `response.text()` trước, parse JSON an toàn.
-- Báo lỗi rõ khi server trả HTML/text.
-- Không lưu admin token vào localStorage.
-- Tự dùng session production từ trang chính nếu đã đăng nhập admin.
+- Không còn tìm token Supabase trong localStorage.
+- Không còn thông báo yêu cầu Supabase Auth.
+- Dùng session đăng nhập admin nội bộ hoặc token admin đã cung cấp.
 
 ### `r2-console.html`
 
-Đã sửa:
+Đã cập nhật:
 
-- Không còn đọc `res.json()` trực tiếp.
-- Không lưu admin/student token vào localStorage.
-- Tự lấy token từ session production nếu có.
-- Báo lỗi rõ khi token không đủ quyền admin hoặc học viên chưa có quyền học.
+- Không còn chữ Supabase trong UI.
+- Trường token đổi thành `Admin Access Token` và `Student Access Token`.
+- Placeholder dùng ID khóa học/bài học trong backend local.
 
-## Biến môi trường production cần có
+## Biến môi trường cần có
 
-Bắt buộc cho Supabase Auth/API:
+Bắt buộc tối thiểu:
 
 ```text
-SUPABASE_URL=
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+PORT=3000
+NODE_ENV=production
 ```
 
-Bắt buộc cho Cloudflare R2 upload/video signed URL:
+Nên có để bảo vệ admin API nếu muốn dùng token ngoài tài khoản admin nội bộ:
+
+```text
+ADMIN_TOKEN=chuoi-token-rat-dai-va-bi-mat
+```
+
+Nên có nếu frontend/backend khác domain:
+
+```text
+APP_BASE_URL=https://ten-mien-web-cua-ban.vn
+CORS_ORIGINS=https://ten-mien-web-cua-ban.vn,https://domain-railway.up.railway.app
+```
+
+Cấu hình nơi lưu file JSON:
+
+```text
+DATA_DIR=/app/data
+DATA_FILE=/app/data/eduvideo-store.json
+```
+
+Cấu hình R2 nếu cần upload/xem video bằng signed URL:
 
 ```text
 R2_ACCOUNT_ID=
@@ -86,72 +111,31 @@ R2_BUCKET_NAME=
 R2_PUBLIC_URL=
 ```
 
-Nên có khi frontend và backend khác domain:
+## Tài khoản mặc định
+
+Backend local tự seed 2 tài khoản nếu chưa có file dữ liệu:
 
 ```text
-APP_BASE_URL=https://ten-mien-web-cua-ban.vn
-CORS_ORIGINS=https://ten-mien-web-cua-ban.vn,https://domain-railway.up.railway.app
-NODE_ENV=production
-PORT=3000
+Học viên:
+Email: hocvien@example.com
+Mật khẩu: 123456
+
+Admin:
+Email: admin@example.com
+Mật khẩu: admin123
 ```
 
-## Cấu trúc bảng Supabase tối thiểu
+Sau khi chạy thật, nên đổi mật khẩu hoặc tạo admin mới rồi khóa/xóa tài khoản demo trong file dữ liệu.
 
-Các API mới giả định có các bảng/cột sau:
+## File dữ liệu local
 
-### `profiles`
+Mặc định dữ liệu được lưu tại:
 
 ```text
-id uuid primary key references auth.users(id)
-role text -- student | admin
-status text -- active | blocked
+data/eduvideo-store.json
 ```
 
-### `courses`
-
-```text
-id uuid primary key
-slug text
- title text
-short_title text
-description text
-level text
-price numeric
-currency text
-status text -- published | draft
-instructor_id uuid
-created_at timestamptz
-```
-
-### `lessons`
-
-```text
-id uuid primary key
-course_id uuid references courses(id)
-title text
-description text
-duration_seconds integer
-is_preview boolean
-sort_order integer
-status text -- published | draft
-video_provider text
-video_asset_id text
-video_url text
-video_status text
-video_mime_type text
-video_size_bytes bigint
-video_uploaded_at timestamptz
-```
-
-### `enrollments`
-
-```text
-id uuid primary key
-user_id uuid references auth.users(id)
-course_id uuid references courses(id)
-status text -- active | pending | blocked
-created_at timestamptz
-```
+Trên Railway hoặc server production, nên mount persistent volume vào `DATA_DIR`. Nếu không có volume, dữ liệu có thể mất khi redeploy/restart tùy nền tảng.
 
 ## Cách chạy local
 
@@ -166,31 +150,26 @@ Mở:
 http://localhost:3000
 ```
 
-Kiểm tra health:
+Kiểm tra:
 
 ```text
-http://localhost:3000/health
-```
-
-Kiểm tra config:
-
-```text
-http://localhost:3000/api/config
+/health
+/api/config
+/api/courses
+/#/courses
+/#/auth
+/#/admin
+/production-course-manager.html
+/r2-console.html
 ```
 
 ## Cách kiểm tra syntax/build
-
-Hiện `package.json` vẫn chưa có script build do lần cập nhật script bị công cụ ghi file chặn. Có thể kiểm tra thủ công bằng:
 
 ```bash
 node --check server.js
 ```
 
-Vì app là Express + static HTML/JS, không có bước bundle frontend. Khi cần, có thể thêm script sau vào `package.json`:
-
-```json
-"build": "node --check server.js"
-```
+App hiện là Express + static HTML/JS, không có bước bundle frontend.
 
 ## Cách deploy Railway
 
@@ -206,18 +185,7 @@ Start command:
 npm start
 ```
 
-Sau deploy kiểm tra:
-
-```text
-/health
-/api/config
-/api/courses
-/#/courses
-/#/auth
-/#/admin
-/production-course-manager.html
-/r2-console.html
-```
+Cần cấu hình persistent volume nếu muốn dữ liệu local JSON không mất khi redeploy.
 
 ## Test checklist sau deploy
 
@@ -225,20 +193,19 @@ Sau deploy kiểm tra:
 
 - [ ] Truy cập trang chủ không trắng màn hình.
 - [ ] Reload trực tiếp URL con không lỗi route.
-- [ ] Mở `/#/courses` hiển thị danh sách khóa học.
-- [ ] Khi Supabase chưa cấu hình, web vẫn chạy demo/localStorage.
-- [ ] Khi Supabase đã cấu hình, đăng ký gọi `/api/auth/register`.
+- [ ] Mở `/#/courses` hiển thị danh sách khóa học từ backend local.
+- [ ] Đăng ký gọi `/api/auth/register`.
 - [ ] Đăng nhập gọi `/api/auth/login`.
-- [ ] Reload sau đăng nhập vẫn giữ session production.
+- [ ] Reload sau đăng nhập vẫn giữ session nếu server chưa restart.
 - [ ] API lỗi hiển thị thông báo thân thiện.
 - [ ] Server trả HTML/text cho API không còn gây `Unexpected token ...`.
 
 ### Admin
 
-- [ ] Tài khoản admin có profile `role=admin`, `status=active`.
-- [ ] Vào `/production-course-manager.html` tạo khóa học thật.
+- [ ] Đăng nhập bằng `admin@example.com / admin123`.
+- [ ] Vào `/production-course-manager.html` tạo khóa học thật vào local JSON.
 - [ ] Tạo bài học thật.
-- [ ] Tạo signed upload URL R2.
+- [ ] Tạo signed upload URL R2 nếu R2 đã cấu hình.
 - [ ] Upload video lên R2.
 - [ ] Gắn video vào lesson.
 - [ ] Học viên có enrollment active lấy được signed URL xem video.
@@ -251,10 +218,9 @@ Sau deploy kiểm tra:
 - [ ] Trang học video không bị vỡ layout.
 - [ ] Bảng admin cuộn được trên mobile.
 
-## Những phần còn chưa thể cam kết 100%
+## Những phần còn cần lưu ý
 
-- Chưa kiểm thử trực tiếp được với database Supabase thật vì chưa có biến môi trường production trong phiên kiểm tra này.
-- Chưa kiểm thử upload R2 thật vì cần bucket/key thật và CORS bucket đúng.
-- Progress học tập production vẫn đang dùng localStorage; muốn thương mại thật cần thêm API lưu progress server-side.
+- Dữ liệu cũ nếu đang nằm trong Supabase sẽ không tự chuyển sang local JSON. Cần export thủ công rồi import vào `data/eduvideo-store.json` nếu muốn giữ dữ liệu đó.
+- Local JSON phù hợp giai đoạn MVP/production nhỏ. Nếu nhiều người dùng đồng thời hoặc cần chống mất dữ liệu cao, nên chuyển sang database thật như PostgreSQL/MySQL/MongoDB hoặc dịch vụ managed khác.
+- Session token đang lưu in-memory; khi server restart, người dùng cần đăng nhập lại. Dữ liệu user/course vẫn giữ nếu `DATA_DIR` có persistent volume.
 - Thanh toán vẫn là demo; muốn bán khóa học thật cần cổng thanh toán và webhook server-side.
-- `package.json` chưa thêm được script `build` do công cụ ghi file chặn khi sửa file này. Lệnh kiểm tra tương đương là `node --check server.js`.
