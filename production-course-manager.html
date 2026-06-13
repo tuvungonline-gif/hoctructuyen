@@ -49,6 +49,7 @@
       function $(id){return document.getElementById(id)}
       function log(value){$('status').textContent = typeof value === 'string' ? value : JSON.stringify(value,null,2)}
       function readJson(value){try{return JSON.parse(value || '{}')}catch(error){return {}}}
+      function sessionToken(){return readJson(localStorage.getItem('eduvideo_production_session_v1') || sessionStorage.getItem('eduvideo_production_session_v1') || '{}').accessToken || ''}
       function findSupabaseAccessToken(){
         const stores = [localStorage, sessionStorage];
         for(const store of stores){
@@ -62,10 +63,7 @@
         }
         return '';
       }
-      function token(){
-        const legacyData = readJson(localStorage.getItem('eduvideo_prod_course_manager'));
-        return sessionStorage.getItem('eduvideo_admin_access_token') || localStorage.getItem('eduvideo_admin_access_token') || findSupabaseAccessToken() || legacyData.adminToken || '';
-      }
+      function token(){return sessionStorage.getItem('eduvideo_admin_access_token') || sessionToken() || findSupabaseAccessToken() || ''}
       function authHeaders(){
         const accessToken = token();
         const headers = {'Content-Type':'application/json'};
@@ -75,18 +73,26 @@
       function saveLocal(){
         const data={courseTitle:$('courseTitle').value,courseDescription:$('courseDescription').value,coursePrice:$('coursePrice').value,lessonTitle:$('lessonTitle').value,lessonDescription:$('lessonDescription').value};
         localStorage.setItem('eduvideo_prod_course_manager',JSON.stringify(data));
-        log('Đã lưu thông tin đang nhập.');
+        log('Đã lưu thông tin đang nhập. Token đăng nhập không được lưu ở trang này.');
       }
-      function loadLocal(){const data=readJson(localStorage.getItem('eduvideo_prod_course_manager'));Object.keys(data).forEach(k=>{if(k !== 'adminToken' && $(k))$(k).value=data[k]})}
+      function loadLocal(){const data=readJson(localStorage.getItem('eduvideo_prod_course_manager'));Object.keys(data).forEach(k=>{if($(k))$(k).value=data[k]})}
       function friendlyError(message){
+        if(message === 'Server returned non-JSON response') return 'Máy chủ đang trả HTML/trang lỗi thay vì JSON. Kiểm tra API URL, route deploy hoặc biến môi trường.';
         if(message === 'Admin permission required' || message === 'Login required' || /permission/i.test(message || '')) return 'Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Tài khoản admin phải có phiên Supabase Auth và profile role admin, status active.';
         return message || 'Có lỗi xảy ra. Vui lòng thử lại.';
       }
-      async function jsonFetch(url, options){const res=await fetch(url,options);const json=await res.json().catch(()=>({}));if(!res.ok)throw new Error(friendlyError(json.error||('HTTP '+res.status)));return json}
+      async function jsonFetch(url, options){
+        const res=await fetch(url,options);
+        const text=await res.text();
+        const json=readJson(text);
+        if(!text.trim().startsWith('{') && !text.trim().startsWith('[')) throw new Error('Server returned non-JSON response');
+        if(!res.ok)throw new Error(friendlyError(json.error||('HTTP '+res.status)));
+        return json;
+      }
       async function checkStatus(){try{const json=await jsonFetch('/api/admin/status',{headers:authHeaders()});log(json)}catch(err){log('Lỗi: '+friendlyError(err.message))}}
       async function createCourseLessonAndUpload(){
         const file=$('videoFile').files[0];
-        if(!token()) {log('Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Vui lòng đăng nhập bằng tài khoản admin Supabase hoặc cấu hình auth admin.');return;}
+        if(!token()) {log('Phiên đăng nhập hiện tại chưa có quyền tạo khóa học thật. Vui lòng đăng nhập bằng tài khoản admin Supabase trước.');return;}
         if(!$('courseTitle').value.trim()) return alert('Nhập tên khóa học.');
         if(!$('lessonTitle').value.trim()) return alert('Nhập tên bài học.');
         if(!file) return alert('Chọn video bài học.');
