@@ -1,0 +1,82 @@
+/* Production UI polish */
+.clean-footer {
+  display: none !important;
+}
+
+.production-admin-entry {
+  padding-top: 24px;
+  padding-bottom: 0;
+}
+
+.production-admin-card {
+  border: 1px solid #dbeafe;
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.production-admin-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+}
+
+.production-admin-content h2 {
+  margin: 8px 0 8px;
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  letter-spacing: -0.04em;
+}
+
+.production-admin-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.demo-note,
+.warning-box,
+#productionStatusBadge,
+.chip.warning,
+.badge.draft {
+  display: none !important;
+}
+
+.auth-aside p,
+.video-info .muted,
+.access-card .warning-box,
+#part3LearnTools .muted,
+#part3AdminOrders .muted,
+.create-course-box,
+.secure-box {
+  display: none !important;
+}
+
+.site-footer {
+  display: none !important;
+}
+
+.page-hero .lead,
+.card .muted,
+.panel .muted {
+  color: #475569;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table th,
+.admin-table td {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .production-admin-content {
+    grid-template-columns: 1fr;
+  }
+
+  .production-admin-actions,
+  .production-admin-actions .btn {
+    width: 100%;
+  }
+}
