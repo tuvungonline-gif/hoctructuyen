@@ -1,7 +1,7 @@
 {
   "name": "eduvideo-lms-production",
   "version": "1.0.0",
-  "description": "EduVideo LMS production-ready frontend/backend shell for Railway, Supabase and Cloudflare R2",
+  "description": "EduVideo LMS production-ready frontend/backend shell for Railway Postgres and Cloudflare R2",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -14,7 +14,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.726.1",
     "@aws-sdk/s3-request-presigner": "^3.726.1",
-    "@supabase/supabase-js": "^2.47.10",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "pg": "^8.13.1"
   }
 }
